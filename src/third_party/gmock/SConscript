@@ -1,0 +1,8 @@
+from SCons.Script import *
+
+Import('env')
+gmock_obj = env.StaticObject('gmock-gtest-all.cc')
+env.Library('gmock', gmock_obj)
+
+main_obj = env.StaticObject('gmock_main.cc')
+env.Library('gmock_main', main_obj)

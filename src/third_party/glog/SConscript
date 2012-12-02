@@ -1,0 +1,9 @@
+from SCons.Script import *
+
+Import('env')
+
+env.Library('glog',
+            Glob('*.cc'),
+			CPPFLAGS='-Isrc/third_party/glog -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare',
+			CPPDEFINES='-DHAVE_CONFIG_H -DNO_FRAME_POINTER')
+

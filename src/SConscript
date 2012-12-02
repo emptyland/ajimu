@@ -1,0 +1,23 @@
+from SCons.Script import *
+
+Import('env')
+
+test_main = env.StaticObject('test_main.cc');
+
+def DefTest(name, obj):
+	env.Program(name + '_test', [obj, test_main],
+		LIBS='glog gflags gmock pthread'.split())
+
+def DefAllTest(name):
+	units = []
+	for i in name:
+		o = env.StaticObject(i + '_test.cc', CPPFLAGS='-std=c++11')
+		DefTest(i, o)
+		units.append(o)
+	units.append(test_main)
+	#env.Program('all_test', units,
+	#	LIBS='glog gflags gmock pthread'.split())
+
+DefAllTest('object object_management lexer environment mach'.split())
+
+
