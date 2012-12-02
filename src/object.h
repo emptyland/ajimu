@@ -13,7 +13,6 @@ namespace values {
 class Object;
 
 enum Type {
-	NIL,
 	BOOLEAN,
 	SYMBOL,
 	FIXED,
@@ -82,7 +81,6 @@ public:
 		DCHECK(IsPair()); return pair_.cdr;
 	}
 
-	bool IsNil() const { return OwnedType() == NIL; }
 	bool IsFixed() const { return OwnedType() == FIXED; }
 	bool IsBoolean() const { return OwnedType() == BOOLEAN; }
 	bool IsCharacter() const { return OwnedType() == CHARACTER; }
@@ -143,6 +141,9 @@ private:
 //
 // List operators:
 //
+inline Object *car(Object *o) { return o->Car(); }
+inline Object *cdr(Object *o) { return o->Cdr(); }
+
 // 2 Parties operator:
 inline Object *caar(Object *o) { return o->Car()->Car(); }
 inline Object *cadr(Object *o) { return o->Cdr()->Car(); }
@@ -158,6 +159,11 @@ inline Object *cdadr(Object *o) { return o->Cdr()->Car()->Cdr(); }
 inline Object *cddar(Object *o) { return o->Car()->Cdr()->Cdr(); }
 inline Object *cdaar(Object *o) { return o->Car()->Car()->Cdr(); }
 inline Object *cdddr(Object *o) { return o->Cdr()->Cdr()->Cdr(); }
+
+// 4 Parties operator:
+inline Object *cadddr(Object *o) {
+	return o->Cdr()->Cdr()->Cdr()->Car();
+}
 
 } // namespace values
 } // namespace ajimu

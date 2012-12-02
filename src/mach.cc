@@ -63,6 +63,30 @@ inline bool IsBegin(Object *expr, ObjectManagement *obm_) {
 	return IsTaggedList(expr, Kof(BeginSymbol));
 }
 
+inline bool IsQuoted(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(QuoteSymbol));
+}
+
+inline bool IsAssignment(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(SetSymbol));
+}
+
+inline bool IsIf(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(IfSymbol));
+}
+
+inline bool IsLet(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(LetSymbol));
+}
+
+inline bool IsAnd(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(AndSymbol));
+}
+
+inline bool IsOr(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(OrSymbol));
+}
+
 inline Object *MakeLambda(Object *params, Object *body,
 		ObjectManagement *obm_) {
 	return obm_->Cons(Kof(LambdaSymbol), obm_->Cons(params, body));
@@ -74,6 +98,21 @@ inline Object *PrepareApplyOperands(Object *args, ObjectManagement *obm_) {
 	return obm_->Cons(args->Car(),
 			PrepareApplyOperands(args->Cdr(), obm_));
 }
+
+inline Object *BindingsParams(Object *bindings, ObjectManagement *obm_) {
+	return bindings == Kof(EmptyList) ?
+		Kof(EmptyList) :
+		obm_->Cons(caar(bindings), // caar: binding parameter
+				BindingsParams(bindings->Cdr(), obm_));
+}
+
+inline Object *BindingsArgs(Object *bindings, ObjectManagement *obm_) {
+	return bindings == Kof(EmptyList) ?
+		Kof(EmptyList) :
+		obm_->Cons(cadar(bindings), // cadar: binding argument
+				BindingsArgs(bindings->Cdr(), obm_));
+}
+
 //-----------------------------------------------------------------------------
 // Class : Mach
 //-----------------------------------------------------------------------------
@@ -94,6 +133,9 @@ bool Mach::Init() {
 		{ "-", &Mach::Dec, },
 		{ "*", &Mach::Mul, },
 		{ "/", &Mach::Div, },
+		{ "=", &Mach::NumberEqual, },
+		{ ">", &Mach::NumberGreat, },
+		{ "<", &Mach::NumberLess,  },
 
 		{ "apply", kApply, },
 		{ "eval",  kEval,  },
@@ -141,6 +183,60 @@ tailcall:
 		return EvalDefinition(expr, env);
 	if (IsLambda(expr, obm_.get()))
 		return obm_->NewClosure(cadr(expr), cddr(expr), env);
+	if (IsQuoted(expr, obm_.get()))
+		return cadr(expr); // Text of quotation
+	if (IsAssignment(expr, obm_.get()))
+		return EvalAssignment(expr, env);
+
+	// If statement
+	if (IsIf(expr, obm_.get())) {
+		expr = Eval(cadr(expr), env) != Kof(False) ? // cadr: if predicate
+			caddr(expr) : // caddr: consequent
+			// if Alternative
+			cdddr(expr) == Kof(EmptyList) ? Kof(False) : cadddr(expr);
+		goto tailcall;
+	}
+
+	// Let statement
+	if (IsLet(expr, obm_.get())) {
+		Object *operators = MakeLambda(
+				BindingsParams(cadr(expr), obm_.get()),
+				cddr(expr), // cddr: let body
+				obm_.get());
+		// cadr: let bings
+		Object *operands = BindingsArgs(cadr(expr), obm_.get());
+		expr = obm_->Cons(operators, operands);
+		goto tailcall;
+	}
+
+	// And Or statement
+	if (IsAnd(expr, obm_.get())) {
+		expr = expr->Cdr(); // cdr: and tests
+		if (expr == Kof(EmptyList))
+			return Kof(True);
+		while (expr->Cdr() != Kof(EmptyList)) {  // Is not last expr?
+			Object *rv = Eval(expr->Car(), env); // car: first expr
+			if (rv == Kof(False))
+				return Kof(False);
+			expr = expr->Cdr(); // cdr: rest expr
+		}
+		expr = expr->Car();
+		goto tailcall;
+	}
+
+	if (IsOr(expr, obm_.get())) {
+		expr = expr->Cdr(); // cdr: or tests
+		if (expr == Kof(EmptyList))
+			return Kof(False);
+		while (expr->Cdr() != Kof(EmptyList)) { // Is not last expr?
+			Object *rv = Eval(expr->Car(), env); // car: first expr
+			if (rv == Kof(True))
+				return Kof(True);
+			expr = expr->Cdr(); // cdr: rest expr
+		}
+		expr = expr->Car();
+		goto tailcall;
+	}
 
 	// Begin block
 	if (IsBegin(expr, obm_.get())) {
@@ -205,6 +301,22 @@ Object *Mach::EvalDefinition(Object *expr, Environment *env) {
 	return Kof(OkSymbol);
 }
 
+Object *Mach::EvalAssignment(Object *expr, Environment *env) {
+	Object *var = cadr(expr); // cadr: assignment variable
+	if (!var->IsSymbol()) {
+		RaiseError("set! : Unexpected symbol.");
+		return nullptr;
+	}
+	Object *val = Eval(caddr(expr), env); // caddr: assignment values
+	Environment::Handle handle(var->Symbol(), env);
+	if (!handle.Valid()) {
+		RaiseErrorf("Unbound variable, %s.", var->Symbol());
+		return nullptr;
+	}
+	env->Define(var->Symbol(), val);
+	return Kof(OkSymbol);
+}
+
 Object *Mach::ListOfValues(Object *operand, Environment *env) {
 	if (operand == Kof(EmptyList))
 		return Kof(EmptyList);
@@ -256,39 +368,128 @@ void Mach::RaiseErrorf(const char *fmt, ...) {
 //
 Object *Mach::Add(Object *args) {
 	long long rv = 0;
+	int i = 0;
 	while (args != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("+ Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
 		rv += args->Car()->Fixed();
 		args = args->Cdr();
+		++i;
 	}
 	return obm_->NewFixed(rv);
 }
 
 Object *Mach::Dec(Object *args) {
 	long long rv = args->Car()->Fixed();
-	while ((args = args->Cdr()) != Kof(EmptyList))
+	int i = 0;
+	while ((args = args->Cdr()) != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("- Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
 		rv -= args->Car()->Fixed();
+		++i;
+	}
 	return obm_->NewFixed(rv);
 }
 
 Object *Mach::Mul(Object *args) {
 	long long rv = 1;
+	int i = 0;
 	while (args != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("* Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
 		rv *= args->Car()->Fixed();
 		args = args->Cdr();
+		++i;
 	}
 	return obm_->NewFixed(rv);
 }
 
 Object *Mach::Div(Object *args) {
 	long long rv = args->Car()->Fixed();
+	int i = 0;
 	while ((args = args->Cdr()) != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("/ Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
 		if (args->Car()->Fixed() == 0) {
-			RaiseError("Div zeor!");
+			RaiseError("/ Div zeor!");
 			return nullptr;
 		}
 		rv /= args->Car()->Fixed();
+		++i;
 	}
 	return obm_->NewFixed(rv);
+}
+
+values::Object *Mach::NumberEqual(values::Object *args) {
+	if (!args->Car()->IsFixed()) {
+		RaiseError("= Unexpected type: arg0, expected fixednum.");
+		return nullptr;
+	}
+	long long arg0 = args->Car()->Fixed();
+	int i = 1;
+	while ((args = args->Cdr()) != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("= Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
+		if (arg0 != args->Car()->Fixed()) {
+			return Kof(False);
+		}
+		++i;
+	}
+	return Kof(True);
+}
+
+values::Object *Mach::NumberGreat(values::Object *args) {
+	if (!args->Car()->IsFixed()) {
+		RaiseError("> Unexpected type: arg0, expected fixednum.");
+		return nullptr;
+	}
+	long long prev = args->Car()->Fixed();
+	int i = 1;
+	while ((args = args->Cdr()) != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("> Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
+		long long next = args->Car()->Fixed();
+		if (prev > next)
+			prev = next;
+		else
+			return Kof(False);
+		++i;
+	}
+	return Kof(True);
+}
+
+values::Object *Mach::NumberLess(values::Object *args) {
+	if (!args->Car()->IsFixed()) {
+		RaiseError("< Unexpected type: arg0, expected fixednum.");
+		return nullptr;
+	}
+	long long prev = args->Car()->Fixed();
+	int i = 1;
+	while ((args = args->Cdr()) != Kof(EmptyList)) {
+		if (!args->Car()->IsFixed()) {
+			RaiseErrorf("< Unexpected type: arg%d, expected fixednum.", i);
+			return nullptr;
+		}
+		long long next = args->Car()->Fixed();
+		if (prev < next)
+			prev = next;
+		else
+			return Kof(False);
+		++i;
+	}
+	return Kof(True);
 }
 
 } // namespace vm

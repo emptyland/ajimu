@@ -21,6 +21,13 @@ public:
 		kDefineSymbol,
 		kLambdaSymbol,
 		kBeginSymbol,
+		kSetSymbol,
+		kIfSymbol,
+		kCondSymbol,
+		kElseSymbol,
+		kLetSymbol,
+		kAndSymbol,
+		kOrSymbol,
 
 		kMax, // Make sure it to be last one
 	};

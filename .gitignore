@@ -3,3 +3,4 @@ tags
 *.a
 *.so
 *.dblite
+*_test

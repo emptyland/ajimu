@@ -1,6 +1,4 @@
-ajimu - a sample scheme implement.
-
-It's name from Ajimu Najimi.
+ajimu - a simple scheme implement. The name from Ajimu Najimi.
 
 Build:
 	Require C++11 supports.

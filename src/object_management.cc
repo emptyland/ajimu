@@ -26,7 +26,13 @@ void ObjectManagement::Init() {
 	constant_[kDefineSymbol] = NewSymbol("define");
 	constant_[kLambdaSymbol] = NewSymbol("lambda");
 	constant_[kBeginSymbol] = NewSymbol("begin");
-	// TODO ...
+	constant_[kSetSymbol] = NewSymbol("set!");
+	constant_[kIfSymbol] = NewSymbol("if");
+	constant_[kCondSymbol] = NewSymbol("cond");
+	constant_[kElseSymbol] = NewSymbol("else");
+	constant_[kLetSymbol] = NewSymbol("let");
+	constant_[kAndSymbol] = NewSymbol("and");
+	constant_[kOrSymbol] = NewSymbol("or");
 
 	// Environment initializing:
 	gc_root_ = NewEnvironment(nullptr);

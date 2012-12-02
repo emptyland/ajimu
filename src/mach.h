@@ -40,11 +40,13 @@ public:
 
 	values::Object *Feed(const char *input);
 
-	values::Object *Eval(values::Object *exp, Environment *env);
+	values::Object *Eval(values::Object *expr, Environment *env);
 
-	values::Object *LookupVariable(values::Object *exp,
+	values::Object *LookupVariable(values::Object *expr,
 			Environment *env);
-	values::Object *EvalDefinition(values::Object *exp,
+	values::Object *EvalDefinition(values::Object *expr,
+			Environment *env);
+	values::Object *EvalAssignment(values::Object *expr,
 			Environment *env);
 	values::Object *ListOfValues(values::Object *operand,
 			Environment *env);
@@ -66,6 +68,9 @@ private:
 	values::Object *Dec(values::Object *args);
 	values::Object *Mul(values::Object *args);
 	values::Object *Div(values::Object *args);
+	values::Object *NumberEqual(values::Object *args);
+	values::Object *NumberGreat(values::Object *args);
+	values::Object *NumberLess(values::Object *args);
 
 	std::unique_ptr<values::ObjectManagement> obm_;
 	std::unique_ptr<Lexer> lex_;

@@ -94,11 +94,71 @@ TEST_F(MachTest, Begin) {
 	ASSERT_EQ(100, ok->Fixed());
 }
 
+TEST_F(MachTest, Assignment) {
+	Object *ok = mach_->Feed(
+		"(define x 0)"
+		"(define y 0)"
+		"(set! x 100)"
+		"(set! y 2)"
+		"(* x y)"
+	);
+	ASSERT_EQ(200, ok->Fixed());
+}
+
+TEST_F(MachTest, If) {
+	Object *ok = mach_->Feed("(if #t 1)");
+	ASSERT_EQ(1, ok->Fixed());
+	ok = mach_->Feed("(if #f 1 0)");
+	ASSERT_EQ(0, ok->Fixed());
+	ok = mach_->Feed(
+		"(define (foo a b c)"
+		"	(and (= a b) (= b c)))"
+		"(foo 1 1 1)"
+	);
+	ASSERT_TRUE(ok->Boolean());
+	ok = mach_->Feed("(foo 1 1 2)");
+	ASSERT_FALSE(ok->Boolean());
+	ok = mach_->Feed(
+		"(define (<= a b)"
+		"	(or (= a b) (< a b)))"
+		"(if (<= 2 2)"
+		"	100"
+		"	200)"
+	);
+	ASSERT_EQ(100, ok->Fixed());
+}
+
+TEST_F(MachTest, Let) {
+	Object *ok = mach_->Feed(
+		"(let ((a 1) (b 2))"
+		"	(+ a b))"
+	);
+	ASSERT_EQ(3, ok->Fixed());
+	ok = mach_->Feed(
+		"(let ((x 1) (y 2))"
+		"	(let ((x 2) (y 3))"
+		"		(* x y)))"
+	);
+	ASSERT_EQ(6, ok->Fixed());
+	ok = mach_->Feed(
+		"(define x 100)"
+		"(let ((a 1) (b 2))"
+		"	(let ((c 3) (d 4))"
+		"		(+ (+ (+ a b) (+ c d)) x)))"
+	);
+	ASSERT_EQ(110, ok->Fixed());
+}
+
 TEST_F(MachTest, Lambda) {
 	Object *ok = mach_->Feed(
 		"((lambda (a b c) (+ a (* b c))) 1 2 3)"
 	);
 	ASSERT_EQ(7, ok->Fixed());
+}
+
+TEST_F(MachTest, Eval) {
+	Object *ok = mach_->Feed("(eval \'(+ 1 1))");
+	ASSERT_EQ(2, ok->Fixed());
 }
 
 } // namespace vm
