@@ -39,15 +39,13 @@ public:
 
 	values::Object *ReadSymbol();
 
+	values::Object *ReadString();
+
 	bool Eof() const { return cur_ >= end_; }
 
 	int Line() const { return line_; }
 
-	bool EatWhiteSpace() {
-		while (isspace(*cur_) && !Eof())
-			++cur_;
-		return !Eof();
-	}
+	bool EatWhiteSpace();
 
 	static bool IsDelimiter(int c);
 
@@ -69,6 +67,8 @@ private:
 	bool ExpectToken(const char *s);
 
 	bool ExpectDelimiter();
+
+	bool ReadByteX(char *byte);
 
 	Lexer(const Lexer &) = delete;
 	void operator = (const Lexer &) = delete;

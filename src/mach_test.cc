@@ -161,6 +161,67 @@ TEST_F(MachTest, Eval) {
 	ASSERT_EQ(2, ok->Fixed());
 }
 
+TEST_F(MachTest, List) {
+	Object *ok = mach_->Feed("(cons 1 #t)");
+	ASSERT_TRUE(ok->IsPair());
+	ASSERT_EQ(1, car(ok)->Fixed());
+	ASSERT_TRUE(cdr(ok)->Boolean());
+
+	ok = mach_->Feed("(cons 1 (cons #t -1))");
+	ASSERT_EQ(1, car(ok)->Fixed());
+	ASSERT_TRUE(cadr(ok)->Boolean());
+	ASSERT_EQ(-1, cddr(ok)->Fixed());
+
+	ok = mach_->Feed(
+		"(define foo '(1 #f 2 #t))"
+		"(car foo)"
+	);
+	ASSERT_EQ(1, ok->Fixed());
+
+	ok = mach_->Feed("(cdr foo)");
+	ASSERT_FALSE(car(ok)->Boolean());
+
+	ok = mach_->Feed(
+		"(define baz (list 9 8 7 6))"
+		"(set-car! baz -1)"
+		"(car baz)"
+	);
+	ASSERT_EQ(-1, ok->Fixed());
+
+	ok = mach_->Feed(
+		"(set-cdr! baz -2)"
+		"(cdr baz)"
+	);
+	ASSERT_EQ(-2, ok->Fixed());
+}
+
+TEST_F(MachTest, Cond) {
+	Object *ok = mach_->Feed(
+		"(define (foo x)"
+		"	(cond"
+		"		((= x 1) 10)"
+		"		((= x 2) 20)"
+		"		((= x 3) 30)"
+		"		(else \"Suck my balls!\")"
+		"	)"
+		")"
+		"(foo 2)"
+	);
+	ASSERT_EQ(20, ok->Fixed());
+
+	ok = mach_->Feed("(foo 3)");
+	ASSERT_EQ(30, ok->Fixed());
+
+	ok = mach_->Feed("(foo 1)");
+	ASSERT_EQ(10, ok->Fixed());
+
+	ok = mach_->Feed("(foo 20)");
+	ASSERT_EQ("Suck my balls!", ok->String().str());
+
+	ok = mach_->Feed("(foo 1)");
+	ASSERT_EQ(10, ok->Fixed());
+}
+
 } // namespace vm
 } // namespace ajimu
 

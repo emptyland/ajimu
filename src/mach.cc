@@ -26,10 +26,10 @@ static auto kEval =  UnsafeCast2Method(2);
 
 #define Kof(i) obm_->Constant(::ajimu::values::ObjectManagement::k##i)
 inline bool IsTaggedList(Object *expr, Object *tag) {
-	Object  *car;
+	Object  *first;
 	if (expr->IsPair()) {
-		car = expr->Car();
-		return car->IsSymbol() && car == tag;
+		first = car(expr);
+		return first->IsSymbol() && first == tag;
 	}
 	return false;
 }
@@ -87,31 +87,52 @@ inline bool IsOr(Object *expr, ObjectManagement *obm_) {
 	return IsTaggedList(expr, Kof(OrSymbol));
 }
 
+inline bool IsCond(Object *expr, ObjectManagement *obm_) {
+	return IsTaggedList(expr, Kof(CondSymbol));
+}
+
 inline Object *MakeLambda(Object *params, Object *body,
 		ObjectManagement *obm_) {
 	return obm_->Cons(Kof(LambdaSymbol), obm_->Cons(params, body));
 }
 
+inline Object *MakeIf(Object *pred, Object *cons, Object *alter,
+		ObjectManagement *obm_) {
+	return obm_->Cons(Kof(IfSymbol),
+				obm_->Cons(pred,
+					obm_->Cons(cons,
+						obm_->Cons(alter, Kof(EmptyList)))));
+}
+
 inline Object *PrepareApplyOperands(Object *args, ObjectManagement *obm_) {
-	if (args->Cdr() == Kof(EmptyList))
-		return args->Car();
-	return obm_->Cons(args->Car(),
-			PrepareApplyOperands(args->Cdr(), obm_));
+	if (cdr(args) == Kof(EmptyList))
+		return car(args);
+	return obm_->Cons(car(args),
+			PrepareApplyOperands(cdr(args), obm_));
 }
 
 inline Object *BindingsParams(Object *bindings, ObjectManagement *obm_) {
 	return bindings == Kof(EmptyList) ?
 		Kof(EmptyList) :
 		obm_->Cons(caar(bindings), // caar: binding parameter
-				BindingsParams(bindings->Cdr(), obm_));
+				BindingsParams(cdr(bindings), obm_));
 }
 
 inline Object *BindingsArgs(Object *bindings, ObjectManagement *obm_) {
 	return bindings == Kof(EmptyList) ?
 		Kof(EmptyList) :
 		obm_->Cons(cadar(bindings), // cadar: binding argument
-				BindingsArgs(bindings->Cdr(), obm_));
+				BindingsArgs(cdr(bindings), obm_));
 }
+
+inline Object *SequenceToExpr(Object *seq, ObjectManagement *obm_) {
+	if (seq == Kof(EmptyList))
+		return Kof(EmptyList);
+	if (cdr(seq) == Kof(EmptyList)) // cdr: last expr
+		return car(seq); // car: first expr
+	return obm_->Cons(Kof(BeginSymbol), seq); // make begin
+}
+
 
 //-----------------------------------------------------------------------------
 // Class : Mach
@@ -129,6 +150,7 @@ bool Mach::Init() {
 		const char *name;
 		values::PrimitiveMethodPtr method;
 	} kProcs[] = {
+		// Arithmetic procedures:
 		{ "+", &Mach::Add, },
 		{ "-", &Mach::Dec, },
 		{ "*", &Mach::Mul, },
@@ -139,6 +161,14 @@ bool Mach::Init() {
 
 		{ "apply", kApply, },
 		{ "eval",  kEval,  },
+
+		// List procedures:
+		{ "cons", &Mach::Cons, },
+		{ "car",  &Mach::Car,  },
+		{ "cdr",  &Mach::Cdr,  },
+		{ "list", &Mach::List, },
+		{ "set-car!", &Mach::SetCar, },
+		{ "set-cdr!", &Mach::SetCdr, },
 	};
 
 	obm_.reset(new ObjectManagement());
@@ -155,6 +185,10 @@ bool Mach::Init() {
 	});
 	global_env_ = obm_->GlobalEnvironment();
 	return true;
+}
+
+int Mach::Line() const {
+	return lex_->Line();
 }
 
 Object *Mach::Feed(const char *input, size_t len) {
@@ -197,6 +231,12 @@ tailcall:
 		goto tailcall;
 	}
 
+	// Cond statement
+	if (IsCond(expr, obm_.get())) {
+		expr = ExpandClauses(cdr(expr)); // cdr: cond clauses
+		goto tailcall;
+	}
+
 	// Let statement
 	if (IsLet(expr, obm_.get())) {
 		Object *operators = MakeLambda(
@@ -211,57 +251,64 @@ tailcall:
 
 	// And Or statement
 	if (IsAnd(expr, obm_.get())) {
-		expr = expr->Cdr(); // cdr: and tests
+		expr = cdr(expr); // cdr: and tests
 		if (expr == Kof(EmptyList))
 			return Kof(True);
-		while (expr->Cdr() != Kof(EmptyList)) {  // Is not last expr?
-			Object *rv = Eval(expr->Car(), env); // car: first expr
+		while (cdr(expr) != Kof(EmptyList)) {  // Is not last expr?
+			Object *rv = Eval(car(expr), env); // car: first expr
+			if (!rv)
+				return nullptr;
 			if (rv == Kof(False))
 				return Kof(False);
-			expr = expr->Cdr(); // cdr: rest expr
+			expr = cdr(expr); // cdr: rest expr
 		}
-		expr = expr->Car();
+		expr = car(expr);
 		goto tailcall;
 	}
 
 	if (IsOr(expr, obm_.get())) {
-		expr = expr->Cdr(); // cdr: or tests
+		expr = cdr(expr); // cdr: or tests
 		if (expr == Kof(EmptyList))
 			return Kof(False);
-		while (expr->Cdr() != Kof(EmptyList)) { // Is not last expr?
-			Object *rv = Eval(expr->Car(), env); // car: first expr
+		while (cdr(expr) != Kof(EmptyList)) { // Is not last expr?
+			Object *rv = Eval(car(expr), env); // car: first expr
+			if (!rv)
+				return nullptr;
 			if (rv == Kof(True))
 				return Kof(True);
-			expr = expr->Cdr(); // cdr: rest expr
+			expr = cdr(expr); // cdr: rest expr
 		}
-		expr = expr->Car();
+		expr = car(expr);
 		goto tailcall;
 	}
 
 	// Begin block
 	if (IsBegin(expr, obm_.get())) {
-		expr = expr->Cdr(); // cdr: begin action
-		while (expr->Cdr() != Kof(EmptyList)) { // Is last action?
-			Eval(expr->Car(), env); // car: first action
-			expr = expr->Cdr();     // cdr: rest actions
+		expr = cdr(expr); // cdr: begin action
+		while (cdr(expr) != Kof(EmptyList)) { // Is last action?
+			if (!Eval(car(expr), env)) // car: first action
+				return nullptr;
+			expr = cdr(expr);     // cdr: rest actions
 		}
-		expr = expr->Car();
+		expr = car(expr);
 		goto tailcall;
 	}
 
 	// Exec block
 	if (expr->IsPair()) { // Is application ?
-		Object *proc = Eval(expr->Car(), env);         // car: operator
-		Object *args = ListOfValues(expr->Cdr(), env); // cdr: operands
+		Object *proc = Eval(car(expr), env);         // car: operator
+		if (!proc)
+			return nullptr; // May be error.
+		Object *args = ListOfValues(cdr(expr), env); // cdr: operands
 
 		if (proc->IsPrimitive() && proc->Primitive() == kApply) {
-			proc = args->Car();
-			args = PrepareApplyOperands(args->Cdr(), obm_.get());
+			proc = car(args);
+			args = PrepareApplyOperands(cdr(args), obm_.get());
 		}
 		if (proc->IsPrimitive()) {
 			auto fn = proc->Primitive();
 			if (fn == kEval) {
-				expr = args->Car();
+				expr = car(args);
 				// TODO env  = MakeEnvironment() cadr
 				goto tailcall;
 			}
@@ -297,6 +344,8 @@ Object *Mach::EvalDefinition(Object *expr, Environment *env) {
 		val = MakeLambda(cdadr(expr), cddr(expr), obm_.get());
 	}
 	val = Eval(val, env);
+	if (!val)
+		return nullptr;
 	env->Define(var->Symbol(), val);
 	return Kof(OkSymbol);
 }
@@ -308,6 +357,8 @@ Object *Mach::EvalAssignment(Object *expr, Environment *env) {
 		return nullptr;
 	}
 	Object *val = Eval(caddr(expr), env); // caddr: assignment values
+	if (!val)
+		return nullptr;
 	Environment::Handle handle(var->Symbol(), env);
 	if (!handle.Valid()) {
 		RaiseErrorf("Unbound variable, %s.", var->Symbol());
@@ -321,26 +372,54 @@ Object *Mach::ListOfValues(Object *operand, Environment *env) {
 	if (operand == Kof(EmptyList))
 		return Kof(EmptyList);
 
-	return obm_->Cons(Eval(operand->Car(), env), // car: first operand
-			ListOfValues(operand->Cdr(), env));  // cdr: rest operands
+	 // car: first operand
+	Object *first = Eval(car(operand), env);
+	if (!first)
+		return nullptr;
+	// cdr: rest operands
+	return obm_->Cons(first, ListOfValues(cdr(operand), env));
 }
+
+Object *Mach::ExpandClauses(Object *clauses) {
+	if (clauses == Kof(EmptyList))
+		return Kof(False);
+
+	Object *first = car(clauses);
+	Object *rest  = cdr(clauses);
+	if (car(first) == Kof(ElseSymbol)) { // is cond else clause?
+		if (rest != Kof(EmptyList)) {
+			RaiseError("Else clause is not last cond->if.");
+			return nullptr;
+		}
+		// rest == EmptyList
+		// cdr: cond actions
+		return SequenceToExpr(cdr(first), obm_.get());
+	}
+	// car: cond predicate
+	return MakeIf(car(first),
+			// cdr: cond action
+			SequenceToExpr(cdr(first), obm_.get()),
+			ExpandClauses(rest),
+			obm_.get());
+}
+
 
 Environment *Mach::ExtendEnvironment(Object *params, Object *args,
 		Environment *top) {
 	Environment *env = obm_->NewEnvironment(top);
 	while (params != Kof(EmptyList)) {
-		if (!params->Car()->IsSymbol()) {
+		if (!car(params)->IsSymbol()) {
 			RaiseError("Parameters must be symbol.");
 			return nullptr;
 		}
 		if (args != Kof(EmptyList)) {
-			env->Define(params->Car()->Symbol(), args->Car());		
-			args = args->Cdr();
+			env->Define(car(params)->Symbol(), car(args));
+			args = cdr(args);
 		} else {
 			// TODO: Use `nil' object
-			env->Define(params->Car()->Symbol(), nullptr);
+			env->Define(car(params)->Symbol(), nullptr);
 		}
-		params = params->Cdr();
+		params = cdr(params);
 	}
 	return env;
 }
@@ -370,26 +449,26 @@ Object *Mach::Add(Object *args) {
 	long long rv = 0;
 	int i = 0;
 	while (args != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("+ Unexpected type: arg%d, expected fixednum.", i);
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("+ : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		rv += args->Car()->Fixed();
-		args = args->Cdr();
+		rv += car(args)->Fixed();
+		args = cdr(args);
 		++i;
 	}
 	return obm_->NewFixed(rv);
 }
 
 Object *Mach::Dec(Object *args) {
-	long long rv = args->Car()->Fixed();
+	long long rv = car(args)->Fixed();
 	int i = 0;
-	while ((args = args->Cdr()) != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("- Unexpected type: arg%d, expected fixednum.", i);
+	while ((args = cdr(args)) != Kof(EmptyList)) {
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("- : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		rv -= args->Car()->Fixed();
+		rv -= car(args)->Fixed();
 		++i;
 	}
 	return obm_->NewFixed(rv);
@@ -399,48 +478,48 @@ Object *Mach::Mul(Object *args) {
 	long long rv = 1;
 	int i = 0;
 	while (args != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("* Unexpected type: arg%d, expected fixednum.", i);
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("* : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		rv *= args->Car()->Fixed();
-		args = args->Cdr();
+		rv *= car(args)->Fixed();
+		args = cdr(args);
 		++i;
 	}
 	return obm_->NewFixed(rv);
 }
 
 Object *Mach::Div(Object *args) {
-	long long rv = args->Car()->Fixed();
+	long long rv = car(args)->Fixed();
 	int i = 0;
-	while ((args = args->Cdr()) != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("/ Unexpected type: arg%d, expected fixednum.", i);
+	while ((args = cdr(args)) != Kof(EmptyList)) {
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("/ : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		if (args->Car()->Fixed() == 0) {
-			RaiseError("/ Div zeor!");
+		if (car(args)->Fixed() == 0) {
+			RaiseError("/ : Div zeor!");
 			return nullptr;
 		}
-		rv /= args->Car()->Fixed();
+		rv /= car(args)->Fixed();
 		++i;
 	}
 	return obm_->NewFixed(rv);
 }
 
-values::Object *Mach::NumberEqual(values::Object *args) {
-	if (!args->Car()->IsFixed()) {
-		RaiseError("= Unexpected type: arg0, expected fixednum.");
+Object *Mach::NumberEqual(Object *args) {
+	if (!car(args)->IsFixed()) {
+		RaiseError("= : Unexpected type: arg0, expected fixednum.");
 		return nullptr;
 	}
-	long long arg0 = args->Car()->Fixed();
+	long long arg0 = car(args)->Fixed();
 	int i = 1;
-	while ((args = args->Cdr()) != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("= Unexpected type: arg%d, expected fixednum.", i);
+	while ((args = cdr(args)) != Kof(EmptyList)) {
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("= : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		if (arg0 != args->Car()->Fixed()) {
+		if (arg0 != car(args)->Fixed()) {
 			return Kof(False);
 		}
 		++i;
@@ -448,19 +527,19 @@ values::Object *Mach::NumberEqual(values::Object *args) {
 	return Kof(True);
 }
 
-values::Object *Mach::NumberGreat(values::Object *args) {
-	if (!args->Car()->IsFixed()) {
-		RaiseError("> Unexpected type: arg0, expected fixednum.");
+Object *Mach::NumberGreat(Object *args) {
+	if (!car(args)->IsFixed()) {
+		RaiseError("> : Unexpected type: arg0, expected fixednum.");
 		return nullptr;
 	}
-	long long prev = args->Car()->Fixed();
+	long long prev = car(args)->Fixed();
 	int i = 1;
-	while ((args = args->Cdr()) != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("> Unexpected type: arg%d, expected fixednum.", i);
+	while ((args = cdr(args)) != Kof(EmptyList)) {
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("> : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		long long next = args->Car()->Fixed();
+		long long next = car(args)->Fixed();
 		if (prev > next)
 			prev = next;
 		else
@@ -470,19 +549,19 @@ values::Object *Mach::NumberGreat(values::Object *args) {
 	return Kof(True);
 }
 
-values::Object *Mach::NumberLess(values::Object *args) {
-	if (!args->Car()->IsFixed()) {
-		RaiseError("< Unexpected type: arg0, expected fixednum.");
+Object *Mach::NumberLess(Object *args) {
+	if (!car(args)->IsFixed()) {
+		RaiseError("< : Unexpected type: arg0, expected fixednum.");
 		return nullptr;
 	}
-	long long prev = args->Car()->Fixed();
+	long long prev = car(args)->Fixed();
 	int i = 1;
-	while ((args = args->Cdr()) != Kof(EmptyList)) {
-		if (!args->Car()->IsFixed()) {
-			RaiseErrorf("< Unexpected type: arg%d, expected fixednum.", i);
+	while ((args = cdr(args)) != Kof(EmptyList)) {
+		if (!car(args)->IsFixed()) {
+			RaiseErrorf("< : Unexpected type: arg%d, expected fixednum.", i);
 			return nullptr;
 		}
-		long long next = args->Car()->Fixed();
+		long long next = car(args)->Fixed();
 		if (prev < next)
 			prev = next;
 		else
@@ -490,6 +569,44 @@ values::Object *Mach::NumberLess(values::Object *args) {
 		++i;
 	}
 	return Kof(True);
+}
+
+Object *Mach::Cons(Object *args) {
+	return obm_->Cons(car(args), cadr(args));
+}
+
+Object *Mach::Car(Object *args) {
+	if (!car(args)->IsPair()) {
+		RaiseError("car : arg0 is not a pair or list.");
+		return nullptr;
+	}
+	return caar(args);
+}
+
+Object *Mach::Cdr(Object *args) {
+	return cdar(args);
+}
+
+Object *Mach::List(Object *args) {
+	return args;
+}
+
+Object *Mach::SetCar(Object *args) {
+	if (!car(args)->IsPair()) {
+		RaiseError("set-car! : arg0 is not a pair or list.");
+		return nullptr;
+	}
+	ObjectManagement::SetCar(car(args), cadr(args));
+	return Kof(OkSymbol);
+}
+
+Object *Mach::SetCdr(Object *args) {
+	if (!car(args)->IsPair()) {
+		RaiseError("set-cdr! : arg0 is not a pair or list.");
+		return nullptr;
+	}
+	ObjectManagement::SetCdr(car(args), cadr(args));
+	return Kof(OkSymbol);
 }
 
 } // namespace vm

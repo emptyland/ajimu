@@ -60,6 +60,23 @@ Object *ObjectManagement::NewSymbol(const std::string &raw) {
 	return o;
 }
 
+Object *ObjectManagement::NewString(const char *raw, size_t len) {
+	// TODO: gc
+	union {
+		String *to_str;
+		char   *to_psz;
+	};
+	to_psz = new char[len + 1 + sizeof(String)];
+	to_str->hash = 0;
+	to_str->len  = len;
+	memcpy(to_str->land, raw, len);
+	to_str->land[len] = '\0';
+
+	Object *o = AllocateObject(STRING);
+	o->string_ = to_str;
+	return o;
+}
+
 Object *ObjectManagement::NewClosure(Object *params, Object *body,
 		Environment *env) {
 	Object *o = AllocateObject(CLOSURE);

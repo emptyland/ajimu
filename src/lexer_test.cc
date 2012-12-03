@@ -7,10 +7,13 @@
 namespace ajimu {
 namespace vm {
 
+using values::Object;
+using values::StringHandle;
+
 class LexerTest : public ::testing::Test {
 protected:
 	virtual void SetUp() override {
-		obm_ = new values::ObjectManagement();
+		obm_ = new ObjectManagement();
 		obm_->Init();
 		lexer_ = new Lexer(obm_);
 		lexer_->AddObserver([this] (const char *err, Lexer *) {
@@ -25,7 +28,7 @@ protected:
 		obm_ = nullptr;
 	}
 
-	values::ObjectManagement *obm_;
+	ObjectManagement *obm_;
 	Lexer *lexer_;
 };
 
@@ -33,7 +36,7 @@ TEST_F(LexerTest, Sanity) {
 	std::string input = "#f";
 	lexer_->Feed(input.c_str(), input.size());
 
-	values::Object *ob = lexer_->Next();
+	Object *ob = lexer_->Next();
 	ASSERT_TRUE(ob != nullptr);
 	ASSERT_EQ(values::BOOLEAN, ob->OwnedType());
 	ASSERT_FALSE(ob->Boolean());
@@ -54,7 +57,7 @@ TEST_F(LexerTest, Sanity) {
 TEST_F(LexerTest, Character) {
 	std::string input("#\\space");
 	lexer_->Feed(input.c_str(), input.size());
-	values::Object *ob = lexer_->Next();
+	Object *ob = lexer_->Next();
 	ASSERT_TRUE(ob != nullptr);
 	ASSERT_EQ(values::CHARACTER, ob->OwnedType());
 	ASSERT_EQ(' ', ob->Character());
@@ -79,7 +82,7 @@ TEST_F(LexerTest, Character) {
 TEST_F(LexerTest, Number) {
 	std::string input("-1");
 	lexer_->Feed(input.c_str(), input.size());
-	values::Object *ob = lexer_->Next();
+	Object *ob = lexer_->Next();
 	ASSERT_TRUE(ob != nullptr);
 	ASSERT_EQ(values::FIXED, ob->OwnedType());
 	ASSERT_EQ(-1LL, ob->Fixed());
@@ -107,7 +110,7 @@ TEST_F(LexerTest, Symbol) {
 	}
 	lexer_->Feed(input.c_str(), input.size());
 	for (const char *s : expected) {
-		values::Object *ob = lexer_->Next();
+		Object *ob = lexer_->Next();
 		ASSERT_TRUE(ob != nullptr) << "Unexpected: " << s;
 		ASSERT_STREQ(s, ob->Symbol());
 	}
@@ -116,7 +119,7 @@ TEST_F(LexerTest, Symbol) {
 TEST_F(LexerTest, Pair) {
 	std::string input("()");
 	lexer_->Feed(input.c_str(), input.size());
-	values::Object *ob = lexer_->Next();
+	Object *ob = lexer_->Next();
 	ASSERT_TRUE(ob != nullptr);
 	ASSERT_EQ(values::PAIR, ob->OwnedType());
 
@@ -145,12 +148,57 @@ TEST_F(LexerTest, List) {
 	 */
 	std::string input("(define x 1)");
 	lexer_->Feed(input.c_str(), input.size());
-	values::Object *ob = lexer_->Next();
+	Object *ob = lexer_->Next();
 	ASSERT_NE(nullptr, ob);
 	ASSERT_TRUE(ob->IsPair());
 	ASSERT_TRUE(ob->Car()->IsSymbol()); // define
 	ASSERT_TRUE(cadr(ob)->IsSymbol());  // x
 	ASSERT_TRUE(caddr(ob)->IsFixed());   // 1
+}
+
+TEST_F(LexerTest, String) {
+	static const char *k = "Hello, World!";
+	std::string input;
+	input.append("\"");
+	input.append(k);
+	input.append("\"");
+
+	lexer_->Feed(input.c_str(), input.size());
+	Object *ob = lexer_->Next();
+	ASSERT_NE(nullptr, ob);
+	StringHandle str(ob->String());
+	ASSERT_STREQ(k, str.c_str());
+	ASSERT_EQ(k, str.str());
+	ASSERT_EQ(strlen(k), str.Length());
+}
+
+TEST_F(LexerTest, StringESC) {
+	static const char *k = "\\r\\n\\a\\b\\f\\t\\v\\\\\\\"";
+	static const char *e = "\r\n\a\b\f\t\v\\\"";
+	std::string input;
+	input.append("\"");
+	input.append(k);
+	input.append("\"");
+
+	lexer_->Feed(input.c_str(), input.size());
+	Object *ob = lexer_->Next();
+	ASSERT_NE(nullptr, ob);
+	StringHandle str(ob->String());
+	ASSERT_STREQ(e, str.c_str());
+}
+
+TEST_F(LexerTest, StringX) {
+	std::string e("\x00\x01\xff\xff\xaf", 5);
+	std::string input;
+	input.append("\"");
+	input.append("\\x00\\x01\\xFF\\xff\\xaF");
+	input.append("\"");
+
+	lexer_->Feed(input.c_str(), input.size());
+	Object *ob = lexer_->Next();
+	ASSERT_NE(nullptr, ob);
+	StringHandle ref(ob->String());
+	ASSERT_EQ(e, ref.str());
 }
 
 } // namespace vm

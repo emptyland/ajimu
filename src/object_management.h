@@ -70,6 +70,8 @@ public:
 
 	Object *NewSymbol(const std::string &raw);
 
+	Object *NewString(const char *raw, size_t len);
+
 	Object *NewClosure(Object *params, Object *body,
 			vm::Environment *env);
 
@@ -82,6 +84,17 @@ public:
 		return o;
 	}
 
+	static Object *SetCar(Object *node, Object *car) {
+		DCHECK(node->IsPair());
+		node->pair_.car = DCHECK_NOTNULL(car);
+		return node;
+	}
+
+	static Object *SetCdr(Object *node, Object *cdr) {
+		DCHECK(node->IsPair());
+		node->pair_.cdr = DCHECK_NOTNULL(cdr);
+		return node;
+	}
 private:
 	ObjectManagement(const ObjectManagement &) = delete;
 	void operator = (const ObjectManagement &) = delete;

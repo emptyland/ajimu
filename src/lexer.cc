@@ -7,7 +7,10 @@
 namespace ajimu {
 namespace vm {
 
-Lexer::Lexer(values::ObjectManagement *obm)
+using values::ObjectManagement;
+using values::Object;
+
+Lexer::Lexer(ObjectManagement *obm)
 	: obm_(obm)
 	, cur_(nullptr)
 	, end_(nullptr)
@@ -23,7 +26,7 @@ void Lexer::Feed(const char *input, size_t len) {
 }
 
 #define Kof(i) obm_->Constant(::ajimu::values::ObjectManagement::k##i)
-values::Object *Lexer::Next() {
+Object *Lexer::Next() {
 	DCHECK(cur_ != nullptr) << "Need call Feed() first!";
 
 	EatWhiteSpace();
@@ -43,7 +46,7 @@ values::Object *Lexer::Next() {
 			}
 			return nullptr;
 		case '\"':
-			break;
+			return ReadString();
 		case '(':
 			++cur_;
 			return ReadPair();
@@ -68,7 +71,7 @@ final:
 	return nullptr;
 }
 
-values::Object *Lexer::ReadCharacter() {
+Object *Lexer::ReadCharacter() {
 	if (Eof()) {
 		RaiseError("Incomplete character literal.");
 		return nullptr;
@@ -97,20 +100,20 @@ values::Object *Lexer::ReadCharacter() {
 	return ExpectDelimiter() ? obm_->NewCharacter(c) : nullptr;
 }
 
-values::Object *Lexer::ReadPair() {
+Object *Lexer::ReadPair() {
 	if (!EatWhiteSpace())
 		return nullptr;
 	if (*cur_ == ')') { // Is empty list(pair) ?
 		++cur_;
 		return Kof(EmptyList);
 	}
-	values::Object *car = Next();
+	Object *car = Next();
 	if (!car)
 		return nullptr;
 	if (!EatWhiteSpace())
 		return nullptr;
 	if (*cur_ != '.') {
-		values::Object *cdr = ReadPair();
+		Object *cdr = ReadPair();
 		return obm_->Cons(car, cdr);
 	}
 	++cur_;
@@ -118,7 +121,7 @@ values::Object *Lexer::ReadPair() {
 		RaiseError("Do not followed by delimiter.");
 		return nullptr;
 	}
-	values::Object *cdr = Next();
+	Object *cdr = Next();
 	if (!cdr || !EatWhiteSpace())
 		return nullptr;
 	if (*cur_++ != ')') {
@@ -128,7 +131,7 @@ values::Object *Lexer::ReadPair() {
 	return obm_->Cons(car, cdr);
 }
 
-values::Object *Lexer::ReadFixed() {
+Object *Lexer::ReadFixed() {
 	long long sign = 1;
 	if (*cur_ == '-') {
 		++cur_; sign = -1;
@@ -147,7 +150,7 @@ values::Object *Lexer::ReadFixed() {
 	return ExpectDelimiter() ? obm_->NewFixed(num * sign) : nullptr;
 }
 
-values::Object *Lexer::ReadSymbol() {
+Object *Lexer::ReadSymbol() {
 	char buf[MAX_SYMBOL_LEN] = {0};
 	size_t len = 0;
 
@@ -170,6 +173,104 @@ values::Object *Lexer::ReadSymbol() {
 	buf[len] = '\0';
 	//--cur_;
 	return obm_->NewSymbol(buf);
+}
+
+#define APPEND(buf, len, c) \
+	if (Eof()) { \
+		RaiseError("ReadString : Non-terminated string literal."); \
+		return nullptr; \
+	} \
+	if (len < sizeof(buf) - 1) \
+		buf[len++] = c; \
+	else { \
+		RaiseErrorf("String too long, Maximum length is %d.", \
+				MAX_SYMBOL_LEN); \
+		return nullptr; \
+	}(void)0
+
+Object *Lexer::ReadString() {
+	++cur_; // Skip first `"'
+	char buf[MAX_SYMBOL_LEN] = {0};
+	char c;
+	size_t len = 0;
+	while ((c = *cur_++) != '"') {
+		if (c == '\\') {
+			c = *cur_++;
+			switch (c) {
+			case 'a':
+				c = '\a';
+				break;
+			case 'b':
+				c = '\b';
+				break;
+			case 'f':
+				c = '\f';
+				break;
+			case 'n':
+				c = '\n';
+				break;
+			case 'r':
+				c = '\r';
+				break;
+			case 't':
+				c = '\t';
+				break;
+			case 'v':
+				c = '\v';
+				break;
+			case '0':
+				c = '\0';
+				break;
+			case '\\':
+				c = '\\';
+				break;
+			case '"':
+				c = '"';
+				break;
+			case 'x':
+				if (!ReadByteX(&c)) return nullptr;
+				break;
+			}
+		}
+		APPEND(buf, len, c);
+	}
+	buf[len] = '\0';
+	return obm_->NewString(buf, len);
+}
+#undef APPEND
+
+bool Lexer::ReadByteX(char *byte) {
+	char bit4[2];
+	for (int i = 0; i < 2; ++i) {
+		if (Eof()) {
+			RaiseError("ReadByteX : Non-terminated \\xNN hex number.");
+			return false;
+		}
+		char c = *cur_++;
+		if (!isxdigit(c)) {
+			RaiseErrorf("ReadByteX : Non-Hex number characer: %c ", c);
+			return false;
+		}
+		if (isdigit(c)) {
+			bit4[i] = c - '0';
+		} else if (islower(c)) {
+			bit4[i] = c - 'a' + 10;
+		} else if (isupper(c)) {
+			bit4[i] = c - 'A' + 10;
+		} else {
+			DLOG(FATAL) << "No reached!";
+		}
+	}
+	*byte = (bit4[0] << 4) | bit4[1];
+	return true;
+}
+
+bool Lexer::EatWhiteSpace() {
+	while (isspace(*cur_) && !Eof()) {
+		if (*cur_++ == '\n')
+			++line_;
+	}
+	return !Eof();
 }
 
 /*static*/ bool Lexer::IsDelimiter(int c) {

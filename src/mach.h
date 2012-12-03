@@ -28,9 +28,11 @@ public:
 		observer_.push_back(callable);
 	}
 
-	int Error() {
+	int Error() const {
 		return error_;
 	}
+
+	int Line() const;
 
 	Environment *GlobalEnvironment() {
 		return global_env_;
@@ -42,27 +44,34 @@ public:
 
 	values::Object *Eval(values::Object *expr, Environment *env);
 
-	values::Object *LookupVariable(values::Object *expr,
-			Environment *env);
-	values::Object *EvalDefinition(values::Object *expr,
-			Environment *env);
-	values::Object *EvalAssignment(values::Object *expr,
-			Environment *env);
-	values::Object *ListOfValues(values::Object *operand,
-			Environment *env);
-
-	Environment *ExtendEnvironment(values::Object *params,
-			values::Object *args, Environment *base);
 private:
 	Mach(const Mach &) = delete;
 	void operator = (const Mach &) = delete;
 
+	values::Object *LookupVariable(values::Object *expr,
+			Environment *env);
+
+	values::Object *EvalDefinition(values::Object *expr,
+			Environment *env);
+
+	values::Object *EvalAssignment(values::Object *expr,
+			Environment *env);
+
+	values::Object *ListOfValues(values::Object *operand,
+			Environment *env);
+
+	values::Object *ExpandClauses(values::Object *clauses);
+
+	Environment *ExtendEnvironment(values::Object *params,
+			values::Object *args, Environment *base);
+
+	// Error output:
 	void RaiseError(const char *err);
 
 	void RaiseErrorf(const char *fmt, ...);
 
 	//
-	// Primitive Proc(s)
+	// Primitive Procedures:
 	//
 	values::Object *Add(values::Object *args);
 	values::Object *Dec(values::Object *args);
@@ -71,6 +80,12 @@ private:
 	values::Object *NumberEqual(values::Object *args);
 	values::Object *NumberGreat(values::Object *args);
 	values::Object *NumberLess(values::Object *args);
+	values::Object *Cons(values::Object *args);
+	values::Object *Car(values::Object *args);
+	values::Object *Cdr(values::Object *args);
+	values::Object *List(values::Object *args);
+	values::Object *SetCar(values::Object *args);
+	values::Object *SetCdr(values::Object *args);
 
 	std::unique_ptr<values::ObjectManagement> obm_;
 	std::unique_ptr<Lexer> lex_;
