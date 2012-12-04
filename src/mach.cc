@@ -150,6 +150,19 @@ bool Mach::Init() {
 		const char *name;
 		values::PrimitiveMethodPtr method;
 	} kProcs[] = {
+		// Type system procedures:
+		{ "boolean?", &Mach::IsBoolean, },
+		{ "symbol?",  &Mach::IsSymbol,  },
+		{ "char?",    &Mach::IsChar,    },
+		{ "vector?",  &Mach::IsVector,  },
+		{ "port?",    &Mach::IsPort,    },
+		{ "null?",    &Mach::IsNull,    },
+		{ "pair?",    &Mach::IsPair,    },
+		{ "number?",  &Mach::IsNumber,  },
+		{ "string?",  &Mach::IsString,  },
+		{ "bytevector?", &Mach::IsByteVector, },
+		{ "procedure?",  &Mach::IsProcedure,  },
+
 		// Arithmetic procedures:
 		{ "+", &Mach::Add, },
 		{ "-", &Mach::Dec, },
@@ -169,6 +182,9 @@ bool Mach::Init() {
 		{ "list", &Mach::List, },
 		{ "set-car!", &Mach::SetCar, },
 		{ "set-cdr!", &Mach::SetCdr, },
+
+		// File
+		{ "load", &Mach::Load, },
 	};
 
 	obm_.reset(new ObjectManagement());
@@ -330,7 +346,7 @@ tailcall:
 Object *Mach::LookupVariable(Object *expr, Environment *env) {
 	Environment::Handle handle(expr->Symbol(), env);
 	if (!handle.Valid())
-		RaiseErrorf("Unbound variable, %s.", expr->Symbol());
+		RaiseErrorf("Unbound variable, \"%s\".", expr->Symbol());
 	return handle.Get();
 }
 
@@ -607,6 +623,133 @@ Object *Mach::SetCdr(Object *args) {
 	}
 	ObjectManagement::SetCdr(car(args), cadr(args));
 	return Kof(OkSymbol);
+}
+
+template<class T>
+class HandleBase {
+public:
+	HandleBase()
+		: naked_(nullptr) {
+	}
+
+	HandleBase(T *naked)
+		: naked_(naked) {
+	}
+
+	T *Get() const {
+		return DCHECK_NOTNULL(naked_);
+	}
+
+	T *Release() {
+		T *rv = naked_; naked_ = nullptr;
+		return DCHECK_NOTNULL(rv);
+	}
+
+	bool Valid() const {
+		return naked_ != nullptr;
+	}
+
+private:
+	T *naked_;
+};
+
+template<class T>
+class Handle : public HandleBase<T> {};
+
+template<>
+class Handle<FILE> : public HandleBase<FILE> {
+public:
+	Handle(FILE *fp)
+		: HandleBase<FILE>(fp) {
+	}
+
+	~Handle() {
+		if (this->Valid())
+			fclose(this->Release());
+	}
+};
+
+Object *Mach::Load(Object *args) {
+	if (!car(args)->IsString()) {
+		RaiseError("load : arg0 is not a string.");
+		return nullptr;
+	}
+	const char *name = car(args)->String().c_str();
+	Handle<FILE> fp(fopen(name, "r"));
+	if (!fp.Valid()) {
+		RaiseErrorf("load : Can not open file \"%s\".", name);
+		return nullptr;
+	}
+	fseek(fp.Get(), 0, SEEK_END);
+	size_t size = ftell(fp.Get());
+	fseek(fp.Get(), 0, SEEK_SET);
+	if (!size) // A empty file
+		return Kof(EmptyList);
+	std::unique_ptr<char[]> buf(new char[size]);
+	if (fread(buf.get(), 1, size, fp.Get()) <= 0) {
+		RaiseErrorf("load : Load file error \"%s\".", name);
+		return nullptr;
+	}
+	Lexer lex(obm_.get());
+	lex.Feed(buf.get(), size);
+	Object *o, *rv;
+	while ((o = lex.Next()) != nullptr) {
+		rv = Eval(o, GlobalEnvironment());
+		if (!rv)
+			return nullptr;
+	}
+	return rv;
+}
+
+Object *Mach::IsBoolean(Object *args) {
+	return car(args)->IsBoolean() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsSymbol(Object *args) {
+	return car(args)->IsSymbol() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsChar(Object *args) {
+	return car(args)->IsCharacter() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsVector(Object *args) {
+	// TODO: Implement vector
+	(void)args;
+	return Kof(False);
+}
+
+Object *Mach::IsPort(Object *args) {
+	// TODO: Implement port
+	(void)args;
+	return Kof(False);
+}
+
+Object *Mach::IsNull(Object *args) {
+	return car(args) == Kof(EmptyList) ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsPair(Object *args) {
+	return car(args)->IsPair() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsNumber(Object *args) {
+	return car(args)->IsFixed() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsString(Object *args) {
+	return car(args)->IsString() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsByteVector(Object *args) {
+	// TODO: Implement bytevector
+	(void)args;
+	return Kof(False);
+}
+
+Object *Mach::IsProcedure(Object *args) {
+	return car(args)->IsPrimitive() ||
+		car(args)->IsClosure() ? Kof(True) : Kof(False);
 }
 
 } // namespace vm

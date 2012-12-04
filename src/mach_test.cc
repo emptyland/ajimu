@@ -222,6 +222,47 @@ TEST_F(MachTest, Cond) {
 	ASSERT_EQ(10, ok->Fixed());
 }
 
+TEST_F(MachTest, Load) {
+	Object *ok = mach_->Feed(
+		"(load \"src/lib/stdlib.scm\")"
+		"(define seq '(0 1 2 3 4 5))"
+		"(cadr seq)"
+	);
+	ASSERT_EQ(1, ok->Fixed());
+
+	ok = mach_->Feed("(car (cddr seq))");
+	ASSERT_EQ(2, ok->Fixed());
+}
+
+TEST_F(MachTest, Types) {
+	Object *ok = mach_->Feed(
+		"(define (typeof obj)"
+		"	(cond "
+		"		((null?      obj) \"null\")"
+		"		((symbol?    obj) \"symbol\")"
+		"		((number?    obj) \"number\")"
+		"		((pair?      obj) \"pair\")"
+		"		((procedure? obj) \"procedure\")"
+		"		(else \"other\")"
+		"	)"
+		")"
+		"(typeof 1)"
+	);
+	ASSERT_STREQ("number", ok->String().c_str());
+
+	ok = mach_->Feed("(typeof typeof)");
+	ASSERT_STREQ("procedure", ok->String().c_str());
+
+	ok = mach_->Feed("(typeof 'typeof)");
+	ASSERT_STREQ("symbol", ok->String().c_str());
+
+	ok = mach_->Feed("(typeof '())");
+	ASSERT_STREQ("null", ok->String().c_str());
+
+	ok = mach_->Feed("(typeof '(1 2))");
+	ASSERT_STREQ("pair", ok->String().c_str());
+}
+
 } // namespace vm
 } // namespace ajimu
 

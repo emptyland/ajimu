@@ -86,6 +86,18 @@ private:
 	values::Object *List(values::Object *args);
 	values::Object *SetCar(values::Object *args);
 	values::Object *SetCdr(values::Object *args);
+	values::Object *Load(values::Object *args);
+	values::Object *IsBoolean(values::Object *args);
+	values::Object *IsSymbol(values::Object *args);
+	values::Object *IsChar(values::Object *args);
+	values::Object *IsVector(values::Object *args);
+	values::Object *IsPort(values::Object *args);
+	values::Object *IsNull(values::Object *args);
+	values::Object *IsPair(values::Object *args);
+	values::Object *IsNumber(values::Object *args);
+	values::Object *IsString(values::Object *args);
+	values::Object *IsByteVector(values::Object *args);
+	values::Object *IsProcedure(values::Object *args);
 
 	std::unique_ptr<values::ObjectManagement> obm_;
 	std::unique_ptr<Lexer> lex_;

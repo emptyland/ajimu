@@ -63,7 +63,7 @@ Object *Lexer::Next() {
 				return ReadFixed();
 			else if (IsInitial(*cur_))
 				return ReadSymbol();
-			RaiseError("Unknown token.");
+			RaiseErrorf("Unknown token. char: \"%c\"", *cur_);
 			goto final;
 		}
 	}
@@ -288,6 +288,7 @@ bool Lexer::EatWhiteSpace() {
 }
 
 /*static*/ bool Lexer::IsInitial(int c) {
+	// All R7RS identifiers
 	switch (c) {
 	case '*':
 	case '/':
@@ -296,6 +297,12 @@ bool Lexer::EatWhiteSpace() {
 	case '=':
 	case '?':
 	case '!':
+	case '.':
+	case ':':
+	case '@':
+	case '^':
+	case '_':
+	case '~':
 		return true;
 	default:
 		return isalpha(c);
