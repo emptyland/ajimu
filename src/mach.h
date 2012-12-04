@@ -38,9 +38,19 @@ public:
 		return global_env_;
 	}
 
+	Lexer *Lex() const {
+		return lex_.get();
+	}
+
+	values::ObjectManagement *Obm() {
+		return obm_.get();
+	}
+
 	values::Object *Feed(const char *input, size_t len);
 
 	values::Object *Feed(const char *input);
+
+	values::Object *EvalFile(const char *filename);
 
 	values::Object *Eval(values::Object *expr, Environment *env);
 
@@ -80,6 +90,7 @@ private:
 	values::Object *NumberEqual(values::Object *args);
 	values::Object *NumberGreat(values::Object *args);
 	values::Object *NumberLess(values::Object *args);
+	values::Object *Display(values::Object *args);
 	values::Object *Cons(values::Object *args);
 	values::Object *Car(values::Object *args);
 	values::Object *Cdr(values::Object *args);

@@ -339,6 +339,7 @@ bool Lexer::ExpectDelimiter() {
 	return true;
 }
 
+#undef Kof
 } // namespace vm
 } // namespace ajimu
 

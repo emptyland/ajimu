@@ -18,6 +18,11 @@ def DefAllTest(name):
 	#env.Program('all_test', units,
 	#	LIBS='glog gflags gmock pthread'.split())
 
-DefAllTest('object object_management lexer environment mach'.split())
+DefAllTest('''object
+	object_management
+	lexer
+	environment
+	mach
+	repl_application'''.split())
 
 

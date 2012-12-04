@@ -3,6 +3,7 @@
 
 #include "glog/logging.h"
 #include "string.h"
+#include <string>
 
 namespace ajimu {
 namespace vm {
@@ -10,6 +11,7 @@ class Mach;
 class Environment;
 } // namespace vm
 namespace values {
+class ObjectManagement;
 class Object;
 
 enum Type {
@@ -28,6 +30,8 @@ typedef Object *(vm::Mach::*PrimitiveMethodPtr)(Object *);
 class Object {
 public:
 	~Object();
+
+	std::string ToString(ObjectManagement *obm);
 
 	Type OwnedType() const {
 		return owned_type_;

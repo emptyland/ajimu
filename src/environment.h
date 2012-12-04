@@ -14,7 +14,6 @@ namespace vm {
 class Environment {
 public:
 	class Handle;
-	typedef std::unordered_map<std::string, values::Object*> Map;
 
 	Environment(Environment *top)
 		: top_(top) {
@@ -40,13 +39,14 @@ private:
 	void operator = (const Environment &) = delete;
 
 	Environment *top_;
-	Map var_;
+	std::unordered_map<std::string, values::Object*> var_;
 }; // class Environment
 
 class Environment::Handle {
 public:
 	Handle(const std::string &name, Environment *env)
-		: found_(nullptr) {
+		: found_(nullptr)
+		, cur_(env) {
 		Lookup(name, env);
 	}
 
@@ -58,6 +58,10 @@ public:
 		return found_ != nullptr;
 	}
 
+	void Set(const std::string &name, values::Object *val) {
+		cur_->Define(name, val);
+	}
+
 private:
 	Handle(const Handle &) = delete;
 	void operator = (const Handle &) = delete;
@@ -65,6 +69,7 @@ private:
 	void Lookup(const std::string &name, Environment *env) {
 		while (!found_) {
 			found_ = env->Lookup(name);
+			cur_   = env;
 			if (!found_)
 				env = env->Next();
 			if (!env)
@@ -73,6 +78,7 @@ private:
 	}
 
 	values::Object *found_;
+	Environment *cur_;
 }; // class Environment::Handle
 
 } // namespace vm

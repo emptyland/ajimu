@@ -3,6 +3,7 @@
 #include "object.h"
 #include "environment.h"
 #include "lexer.h"
+#include "utils.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -133,7 +134,6 @@ inline Object *SequenceToExpr(Object *seq, ObjectManagement *obm_) {
 	return obm_->Cons(Kof(BeginSymbol), seq); // make begin
 }
 
-
 //-----------------------------------------------------------------------------
 // Class : Mach
 //-----------------------------------------------------------------------------
@@ -172,6 +172,7 @@ bool Mach::Init() {
 		{ ">", &Mach::NumberGreat, },
 		{ "<", &Mach::NumberLess,  },
 
+		// Evaluting
 		{ "apply", kApply, },
 		{ "eval",  kEval,  },
 
@@ -182,6 +183,9 @@ bool Mach::Init() {
 		{ "list", &Mach::List, },
 		{ "set-car!", &Mach::SetCar, },
 		{ "set-cdr!", &Mach::SetCdr, },
+
+		// Ouput:
+		{ "display", &Mach::Display, },
 
 		// File
 		{ "load", &Mach::Load, },
@@ -220,6 +224,36 @@ Object *Mach::Feed(const char *input, size_t len) {
 
 Object *Mach::Feed(const char *input) {
 	return Feed(input, strlen(input));
+}
+
+Object *Mach::EvalFile(const char *name) {
+	utils::Handle<FILE> fp(fopen(name, "r"));
+	if (!fp.Valid()) {
+		RaiseErrorf("load : Can not open file \"%s\".", name);
+		return nullptr;
+	}
+	// Get file's size
+	fseek(fp.Get(), 0, SEEK_END);
+	size_t size = ftell(fp.Get());
+	fseek(fp.Get(), 0, SEEK_SET);
+	if (!size) // A empty file
+		return Kof(EmptyList);
+	std::unique_ptr<char[]> buf(new char[size]);
+	// Read all
+	if (fread(buf.get(), 1, size, fp.Get()) <= 0) {
+		RaiseErrorf("load : Load file error \"%s\".", name);
+		return nullptr;
+	}
+	// Eval it!
+	Lexer lex(obm_.get());
+	lex.Feed(buf.get(), size);
+	Object *o, *rv;
+	while ((o = lex.Next()) != nullptr) {
+		rv = Eval(o, GlobalEnvironment());
+		if (!rv)
+			return nullptr;
+	}
+	return rv;
 }
 
 Object *Mach::Eval(Object *expr, Environment *env) {
@@ -380,7 +414,8 @@ Object *Mach::EvalAssignment(Object *expr, Environment *env) {
 		RaiseErrorf("Unbound variable, %s.", var->Symbol());
 		return nullptr;
 	}
-	env->Define(var->Symbol(), val);
+	//env->Define(var->Symbol(), val);
+	handle.Set(var->Symbol(), val);
 	return Kof(OkSymbol);
 }
 
@@ -587,6 +622,13 @@ Object *Mach::NumberLess(Object *args) {
 	return Kof(True);
 }
 
+Object *Mach::Display(Object *args) {
+	Object *o = car(args);
+	printf("%s\n", o->ToString(obm_.get()).c_str());
+	// TODO:
+	return Kof(OkSymbol);
+}
+
 Object *Mach::Cons(Object *args) {
 	return obm_->Cons(car(args), cadr(args));
 }
@@ -625,49 +667,6 @@ Object *Mach::SetCdr(Object *args) {
 	return Kof(OkSymbol);
 }
 
-template<class T>
-class HandleBase {
-public:
-	HandleBase()
-		: naked_(nullptr) {
-	}
-
-	HandleBase(T *naked)
-		: naked_(naked) {
-	}
-
-	T *Get() const {
-		return DCHECK_NOTNULL(naked_);
-	}
-
-	T *Release() {
-		T *rv = naked_; naked_ = nullptr;
-		return DCHECK_NOTNULL(rv);
-	}
-
-	bool Valid() const {
-		return naked_ != nullptr;
-	}
-
-private:
-	T *naked_;
-};
-
-template<class T>
-class Handle : public HandleBase<T> {};
-
-template<>
-class Handle<FILE> : public HandleBase<FILE> {
-public:
-	Handle(FILE *fp)
-		: HandleBase<FILE>(fp) {
-	}
-
-	~Handle() {
-		if (this->Valid())
-			fclose(this->Release());
-	}
-};
 
 Object *Mach::Load(Object *args) {
 	if (!car(args)->IsString()) {
@@ -675,30 +674,7 @@ Object *Mach::Load(Object *args) {
 		return nullptr;
 	}
 	const char *name = car(args)->String().c_str();
-	Handle<FILE> fp(fopen(name, "r"));
-	if (!fp.Valid()) {
-		RaiseErrorf("load : Can not open file \"%s\".", name);
-		return nullptr;
-	}
-	fseek(fp.Get(), 0, SEEK_END);
-	size_t size = ftell(fp.Get());
-	fseek(fp.Get(), 0, SEEK_SET);
-	if (!size) // A empty file
-		return Kof(EmptyList);
-	std::unique_ptr<char[]> buf(new char[size]);
-	if (fread(buf.get(), 1, size, fp.Get()) <= 0) {
-		RaiseErrorf("load : Load file error \"%s\".", name);
-		return nullptr;
-	}
-	Lexer lex(obm_.get());
-	lex.Feed(buf.get(), size);
-	Object *o, *rv;
-	while ((o = lex.Next()) != nullptr) {
-		rv = Eval(o, GlobalEnvironment());
-		if (!rv)
-			return nullptr;
-	}
-	return rv;
+	return EvalFile(name);
 }
 
 Object *Mach::IsBoolean(Object *args) {
@@ -752,6 +728,7 @@ Object *Mach::IsProcedure(Object *args) {
 		car(args)->IsClosure() ? Kof(True) : Kof(False);
 }
 
+#undef Kof
 } // namespace vm
 } // namespace ajimu
 
