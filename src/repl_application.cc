@@ -112,7 +112,7 @@ const char *ReplApplication::Paint(const char *esc) {
 }
 
 #define Kof(i) \
-	(mach_->Obm()->Constant(::ajimu::values::ObjectManagement::k##i))
+	(mach_->Obm()->Constant(::ajimu::values::k##i))
 void ReplApplication::Print(values::Object *o) {
 	bool rest = false;
 	switch (o->OwnedType()) {

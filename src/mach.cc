@@ -25,7 +25,7 @@ inline values::PrimitiveMethodPtr UnsafeCast2Method(intptr_t i) {
 static auto kApply = UnsafeCast2Method(1);
 static auto kEval =  UnsafeCast2Method(2);
 
-#define Kof(i) obm_->Constant(::ajimu::values::ObjectManagement::k##i)
+#define Kof(i) obm_->Constant(::ajimu::values::k##i)
 inline bool IsTaggedList(Object *expr, Object *tag) {
 	Object  *first;
 	if (expr->IsPair()) {

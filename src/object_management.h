@@ -10,28 +10,28 @@ class Environment;
 } // namespace vm
 namespace values {
 
+enum Constants {
+	kFalse,
+	kTrue,
+	kEmptyList,
+	kQuoteSymbol,
+	kOkSymbol,
+	kDefineSymbol,
+	kLambdaSymbol,
+	kBeginSymbol,
+	kSetSymbol,
+	kIfSymbol,
+	kCondSymbol,
+	kElseSymbol,
+	kLetSymbol,
+	kAndSymbol,
+	kOrSymbol,
+
+	kMax, // Make sure it to be last one
+};
+
 class ObjectManagement {
 public:
-	enum Constants {
-		kFalse,
-		kTrue,
-		kEmptyList,
-		kQuoteSymbol,
-		kOkSymbol,
-		kDefineSymbol,
-		kLambdaSymbol,
-		kBeginSymbol,
-		kSetSymbol,
-		kIfSymbol,
-		kCondSymbol,
-		kElseSymbol,
-		kLetSymbol,
-		kAndSymbol,
-		kOrSymbol,
-
-		kMax, // Make sure it to be last one
-	};
-
 	ObjectManagement();
 
 	~ObjectManagement();

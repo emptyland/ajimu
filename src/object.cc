@@ -7,7 +7,7 @@ namespace values {
 
 std::string PrimitiveValue2String(Object *o);
 
-#define Kof(i) obm->Constant(::ajimu::values::ObjectManagement::k##i)
+#define Kof(i) obm->Constant(::ajimu::values::k##i)
 Object::~Object() {
 	switch (OwnedType()) {
 	case STRING: 

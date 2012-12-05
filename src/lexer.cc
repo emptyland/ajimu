@@ -25,7 +25,7 @@ void Lexer::Feed(const char *input, size_t len) {
 	line_ = 0;
 }
 
-#define Kof(i) obm_->Constant(::ajimu::values::ObjectManagement::k##i)
+#define Kof(i) obm_->Constant(::ajimu::values::k##i)
 Object *Lexer::Next() {
 	DCHECK(cur_ != nullptr) << "Need call Feed() first!";
 
