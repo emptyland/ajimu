@@ -1,4 +1,5 @@
 #include "object_management.cc"
+#include "object.cc"
 #include "gmock/gmock.h"
 
 namespace ajimu {
@@ -61,6 +62,23 @@ TEST_F(ObjectManagementTest, Environment) {
 	ASSERT_EQ(env, obm_->GlobalEnvironment());
 
 	ASSERT_NE(env, obm_->NewEnvironment(env));
+}
+
+TEST_F(ObjectManagementTest, CollectEnvironment) {
+	Environment *env;
+	int i = 100;
+	while (i--) {
+		env = obm_->TEST_NewEnvironment(nullptr);
+		ASSERT_NE(nullptr, env);
+	}
+}
+
+TEST_F(ObjectManagementTest, CollectObject) {
+	int i = 10000;
+	while (i--) {
+		Object *o = obm_->NewFixed(10000);
+		ASSERT_NE(nullptr, o);
+	}
 }
 
 } // namespace values

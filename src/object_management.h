@@ -32,11 +32,24 @@ enum Constants {
 
 class ObjectManagement {
 public:
+	// All GC state (step)
+	enum GcState {
+		kPause,
+		kPropagate,
+		kSweepEnv,
+		kSweep,
+		kFinalize,
+	};
+
 	ObjectManagement();
 
 	~ObjectManagement();
 
 	void Init();
+
+	size_t AllocatedSize() const {
+		return allocated_;
+	}
 
 	//
 	// For Environment allocating:
@@ -44,6 +57,8 @@ public:
 	vm::Environment *GlobalEnvironment() { return gc_root_; }
 
 	vm::Environment *NewEnvironment(vm::Environment *top);
+
+	vm::Environment *TEST_NewEnvironment(vm::Environment *top);
 
 	Object *Constant(Constants i);
 
@@ -75,7 +90,8 @@ public:
 	Object *NewClosure(Object *params, Object *body,
 			vm::Environment *env);
 
-	Object *NewPrimitive(const std::string &name, PrimitiveMethodPtr method);
+	Object *NewPrimitive(const std::string &name,
+			PrimitiveMethodPtr method);
 
 	Object *Cons(Object *car, Object *cdr) {
 		Object *o = AllocateObject(PAIR);
@@ -95,19 +111,43 @@ public:
 		node->pair_.cdr = DCHECK_NOTNULL(cdr);
 		return node;
 	}
+
 private:
 	ObjectManagement(const ObjectManagement &) = delete;
 	void operator = (const ObjectManagement &) = delete;
 
 	Object *AllocateObject(Type type);
 
+	void CollectingTick();
+
+	void MarkObject(Object *o);
+
+	void MarkEnvironment(vm::Environment *env);
+
+	void SweepEnvironment();
+
+	void SweepObject();
+
 	vm::Environment *gc_root_;
 	Object *constant_[kMax];
 	std::unordered_map<std::string, Object*> symbol_;
+
+	// For GC:
+	int gc_state_;
+	bool gc_started_;
+	unsigned white_flag_;
+	size_t allocated_;
+
+	// Object in gc
+	Reachable obj_list_;
+
+	// Environment in gc
+	Reachable  env_list_;
+	size_t env_mark_;
 }; // class ObjectManagement
 
-#define OBM(method) \
-	::ajimu::values::ObjectManagement::##method
+//#define OBM(method) \
+//	::ajimu::values::ObjectManagement::##method
 
 } // namespace values
 } // namespace ajimu

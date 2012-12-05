@@ -9,11 +9,31 @@ namespace values {
 using vm::Environment;
 
 ObjectManagement::ObjectManagement()
-	: gc_root_(nullptr) {
+	: gc_root_(nullptr)
+	, gc_state_(kPause)
+	, gc_started_(false)
+	, white_flag_(Reachable::WHITE_BIT0)
+	, allocated_(0)
+	, obj_list_(nullptr, white_flag_)
+	, env_list_(nullptr, white_flag_)
+	, env_mark_(0) {
 	memset(constant_, 0, sizeof(constant_));
 }
 
 ObjectManagement::~ObjectManagement() {
+	Reachable *i, *p;
+	i = obj_list_.next_;
+	while (i) {
+		p = i;
+		i = i->next_;
+		delete static_cast<Object*>(p);
+	}
+	i = env_list_.next_;
+	while (i) {
+		p = i;
+		i = i->next_;
+		delete static_cast<Environment*>(p);
+	}
 }
 
 void ObjectManagement::Init() {
@@ -36,6 +56,9 @@ void ObjectManagement::Init() {
 
 	// Environment initializing:
 	gc_root_ = NewEnvironment(nullptr);
+
+	// GC startup:
+	gc_started_ = true;
 }
 
 Object *ObjectManagement::Constant(Constants e) {
@@ -86,7 +109,8 @@ Object *ObjectManagement::NewClosure(Object *params, Object *body,
 	return o;
 }
 
-Object *ObjectManagement::NewPrimitive(const std::string &name, PrimitiveMethodPtr method) {
+Object *ObjectManagement::NewPrimitive(const std::string &name,
+		PrimitiveMethodPtr method) {
 	Object *o = AllocateObject(PRIMITIVE);
 	o->primitive_ = method;
 
@@ -100,13 +124,176 @@ Environment *ObjectManagement::NewEnvironment(Environment *top) {
 		DLOG(ERROR) << "Local environment top not be `nullptr\'.";
 		return nullptr;
 	}
-	// TODO: Implement gc.
-	return new Environment(top);
+	allocated_ += sizeof(Environment);
+	CollectingTick();
+
+	auto env = new Environment(top, env_list_.next_, white_flag_);
+	env_list_.next_ = env; // Linked to environment list.
+	return env;
+}
+
+Environment *ObjectManagement::TEST_NewEnvironment(vm::Environment *top) {
+	allocated_ += sizeof(Environment);
+	CollectingTick();
+
+	auto env = new Environment(top, env_list_.next_, white_flag_);
+	env_list_.next_ = env; // Linked to environment list.
+	return env;
 }
 
 Object *ObjectManagement::AllocateObject(Type type) {
-	// TODO: Implement gc.
-	return new Object(type);
+	allocated_ += sizeof(Object);
+	CollectingTick();
+
+	Object *o = new Object(type, obj_list_.next_, white_flag_);
+	obj_list_.next_ = o; // Linked to object list.
+	return o;
+}
+
+void ObjectManagement::CollectingTick() {
+	if (!gc_started_) return;
+
+tail:
+	switch (gc_state_) {
+	case kPause: // GC Pause
+		// TODO:
+		// Switch the white flag!
+		white_flag_ = InvWhite(white_flag_);
+		// Mark root first.
+		gc_root_->ToBlack();
+		++gc_state_; 
+		DLOG(INFO) << "----------------------------------\n";
+		DLOG(INFO) << "kPause - white:" << white_flag_
+			<< " allocated:" << allocated_;
+		goto tail;
+	case kPropagate: // Mark root environment
+		if (env_mark_ >= gc_root_->Count()) {
+			env_mark_ = 0;
+			++gc_state_;
+			DLOG(INFO) << "kPropagate -";
+			break;
+		}
+		// Mark one slot by one time!
+		MarkObject(gc_root_->At(env_mark_++));
+		break;
+	case kSweepEnv: // Sweep environments
+		SweepEnvironment();
+		++gc_state_;
+		DLOG(INFO) << "kSweepEnv - allocated:" << allocated_;
+		break;
+	case kSweep: // Sweep objects
+		SweepObject();
+		++gc_state_;
+		DLOG(INFO) << "kSweep - allocated:" << allocated_;
+		break;
+	case kFinalize:
+		gc_state_ = kPause;
+		DLOG(INFO) << "kFinalize - allocated:" << allocated_;
+		break;
+	default:
+		DLOG(FATAL) << "No reached!";
+		break;
+	}
+}
+
+void ObjectManagement::MarkObject(Object *o) {
+	if (o->IsBlack()) return;
+
+	switch (o->OwnedType()) {
+	case SYMBOL:
+	case BOOLEAN:
+		// Skip boolean and symbol type
+		break;
+	case FIXED:
+	case CHARACTER:
+	case STRING:
+	case PRIMITIVE:
+		o->ToBlack();
+		break;
+	case CLOSURE:
+		MarkObject(o->Params());
+		MarkObject(o->Body());
+		MarkEnvironment(o->Environment());
+		break;
+	case PAIR:
+		while (o != Constant(kEmptyList)) {
+			o->ToBlack();
+			MarkObject(car(o));
+			o = cdr(o);
+		}
+		break;
+	}
+}
+
+void ObjectManagement::MarkEnvironment(Environment *env) {
+	if (env->IsBlack()) return;
+
+tail:
+	//if (!env->TestInvWhite(white_flag_)) {
+	if (!env->IsBlack()) {
+		env->ToBlack();
+		for (auto elem : env->Variable())
+			MarkObject(elem);
+	}
+	env = env->Next();
+	if (env) goto tail;
+}
+
+void ObjectManagement::SweepEnvironment() {
+	/*Reachable *sweep = env_sweep_;
+	while (sweep->next_) {
+		Reachable *next = sweep->next_;
+		if (next->TestInvWhite(white_flag_)) {
+			sweep->next_ = next->next_;
+			delete static_cast<Environment*>(next);
+			allocated_ -= sizeof(Environment);
+			break;
+		}
+		next->ToWhite(white_flag_);
+		sweep = next;
+	}
+	env_sweep_ = sweep->next_;
+	*/
+	int sweeped = 0;
+	Reachable *sweep = &env_list_;
+	while (sweep->next_) {
+		Reachable *next = sweep->next_;
+		if (next->TestInvWhite(white_flag_)) {
+			// Environment Collected!
+			sweep->next_ = next->next_;
+			delete static_cast<Environment*>(next);
+			allocated_ -= sizeof(Environment);
+			sweep = sweep->next_;
+			++sweeped;
+		} else {
+			next->ToWhite(white_flag_);
+			sweep = next;
+		}
+	}
+	DLOG(INFO) << "SweepEnvironment() sweeped:" << sweeped;
+}
+
+void ObjectManagement::SweepObject() {
+	Reachable *sweep = &obj_list_;
+	int sweeped = 0;
+	while (sweep->next_) {
+		Object *next = static_cast<Object*>(sweep->next_);
+		if (next->TestInvWhite(white_flag_) &&
+				!next->IsSymbol() &&
+				!next->IsBoolean() &&
+				next != Constant(kEmptyList)) {
+			// Object Collected!
+			sweep->next_ = next->next_;
+			delete next;
+			allocated_ -= sizeof(Object);
+			sweep = sweep->next_;
+			++sweeped;
+		} else {
+			next->ToWhite(white_flag_);
+			sweep = next;
+		}
+	}
+	DLOG(INFO) << "SweepObject() sweeped:" << sweeped;
 }
 
 } // namespace values

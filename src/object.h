@@ -1,6 +1,7 @@
 #ifndef AJIMU_VALUES_OBJECT_H
 #define AJIMU_VALUES_OBJECT_H
 
+#include "reachable.h"
 #include "glog/logging.h"
 #include "string.h"
 #include <string>
@@ -27,7 +28,7 @@ enum Type {
 
 typedef Object *(vm::Mach::*PrimitiveMethodPtr)(Object *);
 
-class Object {
+class Object : public Reachable {
 public:
 	~Object();
 
@@ -96,8 +97,9 @@ public:
 
 	friend class ObjectManagement;
 private:
-	Object(Type type)
-		: owned_type_(type) {
+	Object(Type type, Reachable *next, unsigned white)
+		: Reachable(next, white)
+		, owned_type_(type) {
 	}
 
 	Type owned_type_;
