@@ -84,7 +84,6 @@ Object *ObjectManagement::NewSymbol(const std::string &raw) {
 }
 
 Object *ObjectManagement::NewString(const char *raw, size_t len) {
-	// TODO: gc
 	union {
 		String *to_str;
 		char   *to_psz;
@@ -125,7 +124,6 @@ Environment *ObjectManagement::NewEnvironment(Environment *top) {
 		return nullptr;
 	}
 	allocated_ += sizeof(Environment);
-	CollectingTick();
 
 	auto env = new Environment(top, env_list_.next_, white_flag_);
 	env_list_.next_ = env; // Linked to environment list.
@@ -134,7 +132,6 @@ Environment *ObjectManagement::NewEnvironment(Environment *top) {
 
 Environment *ObjectManagement::TEST_NewEnvironment(vm::Environment *top) {
 	allocated_ += sizeof(Environment);
-	CollectingTick();
 
 	auto env = new Environment(top, env_list_.next_, white_flag_);
 	env_list_.next_ = env; // Linked to environment list.
@@ -143,17 +140,16 @@ Environment *ObjectManagement::TEST_NewEnvironment(vm::Environment *top) {
 
 Object *ObjectManagement::AllocateObject(Type type) {
 	allocated_ += sizeof(Object);
-	CollectingTick();
 
 	Object *o = new Object(type, obj_list_.next_, white_flag_);
 	obj_list_.next_ = o; // Linked to object list.
 	return o;
 }
 
-void ObjectManagement::CollectingTick() {
+void ObjectManagement::GcTick(Object *rv, Object *expr) {
 	if (!gc_started_) return;
 
-tail:
+//tail:
 	switch (gc_state_) {
 	case kPause: // GC Pause
 		// TODO:
@@ -161,20 +157,26 @@ tail:
 		white_flag_ = InvWhite(white_flag_);
 		// Mark root first.
 		gc_root_->ToBlack();
+		// Mark local expr
+		if (expr) MarkObject(expr);
+		if (rv)   MarkObject(rv);
 		++gc_state_; 
 		DLOG(INFO) << "----------------------------------\n";
 		DLOG(INFO) << "kPause - white:" << white_flag_
 			<< " allocated:" << allocated_;
-		goto tail;
+		break;
 	case kPropagate: // Mark root environment
-		if (env_mark_ >= gc_root_->Count()) {
+		/*if (env_mark_ >= gc_root_->Count()) {
 			env_mark_ = 0;
 			++gc_state_;
 			DLOG(INFO) << "kPropagate -";
 			break;
-		}
+		}*/
 		// Mark one slot by one time!
-		MarkObject(gc_root_->At(env_mark_++));
+		for (auto var : gc_root_->Variable())
+			MarkObject(var);
+		++gc_state_;
+		DLOG(INFO) << "kPropagate -";
 		break;
 	case kSweepEnv: // Sweep environments
 		SweepEnvironment();
@@ -197,7 +199,8 @@ tail:
 }
 
 void ObjectManagement::MarkObject(Object *o) {
-	if (o->IsBlack()) return;
+	/*DCHECK(freed_.find(o) == freed_.end())
+		<< "Dup freed obj! addr: " << o;*/
 
 	switch (o->OwnedType()) {
 	case SYMBOL:
@@ -208,29 +211,30 @@ void ObjectManagement::MarkObject(Object *o) {
 	case CHARACTER:
 	case STRING:
 	case PRIMITIVE:
-		o->ToBlack();
+		Mark(o);
 		break;
 	case CLOSURE:
+		Mark(o);
 		MarkObject(o->Params());
 		MarkObject(o->Body());
 		MarkEnvironment(o->Environment());
 		break;
 	case PAIR:
-		while (o != Constant(kEmptyList)) {
-			o->ToBlack();
+		if (o != Constant(kEmptyList)) {
+			Mark(o);
 			MarkObject(car(o));
-			o = cdr(o);
+			MarkObject(cdr(o));
 		}
 		break;
 	}
 }
 
 void ObjectManagement::MarkEnvironment(Environment *env) {
-	if (env->IsBlack()) return;
-
 tail:
 	//if (!env->TestInvWhite(white_flag_)) {
-	if (!env->IsBlack()) {
+	if (ShouldMark(env)) {
+		/*DCHECK(freed_.find(env) == freed_.end())
+			<< "Dup freed env! addr: " << env;*/
 		env->ToBlack();
 		for (auto elem : env->Variable())
 			MarkObject(elem);
@@ -261,6 +265,7 @@ void ObjectManagement::SweepEnvironment() {
 		if (next->TestInvWhite(white_flag_)) {
 			// Environment Collected!
 			sweep->next_ = next->next_;
+			freed_.insert(next);
 			delete static_cast<Environment*>(next);
 			allocated_ -= sizeof(Environment);
 			sweep = sweep->next_;
@@ -284,12 +289,14 @@ void ObjectManagement::SweepObject() {
 				next != Constant(kEmptyList)) {
 			// Object Collected!
 			sweep->next_ = next->next_;
+			freed_.insert(next);
 			delete next;
 			allocated_ -= sizeof(Object);
 			sweep = sweep->next_;
 			++sweeped;
 		} else {
-			next->ToWhite(white_flag_);
+			if (next->IsBlack())
+				next->ToWhite(white_flag_);
 			sweep = next;
 		}
 	}

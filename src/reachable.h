@@ -8,6 +8,7 @@ namespace values {
 class ObjectManagement;
 
 inline unsigned InvWhite(unsigned white);
+inline unsigned White(unsigned white);
 
 class Reachable {
 public:
@@ -22,6 +23,10 @@ public:
 
 	bool TestInvWhite(unsigned white) const {
 		return color_ == InvWhite(white);
+	}
+
+	bool TestWhite(unsigned white) const {
+		return color_ == White(white);
 	}
 
 	bool IsBlack() const {
@@ -61,6 +66,12 @@ inline unsigned InvWhite(unsigned white) {
 	return (white == Reachable::WHITE_BIT0) ?
 		Reachable::WHITE_BIT1 :
 		Reachable::WHITE_BIT0;
+}
+
+inline unsigned White(unsigned white) {
+	DCHECK(Reachable::WHITE_BIT0 == white ||
+			Reachable::WHITE_BIT1 == white);
+	return white;
 }
 
 } // namespace values

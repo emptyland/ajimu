@@ -31,6 +31,9 @@ public:
 
 	size_t Define(const std::string &name, values::Object *val) {
 		auto iter = map_.find(name);
+		/*if (Next() == nullptr)
+			DLOG(ERROR) << "name: " << name << " object:" << val;
+		*/
 		if (iter == map_.end()) {
 			var_.push_back(DCHECK_NOTNULL(val));
 			map_.insert(std::make_pair(name, var_.size() - 1));

@@ -11,6 +11,7 @@ namespace app {
 TEST(REPLTest, REPL) {
 	ReplApplication app;
 	ASSERT_TRUE(app.Init());
+	app.Load("src/lib/stdlib.scm");
 	app.Run();
 }
 

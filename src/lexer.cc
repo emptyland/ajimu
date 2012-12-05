@@ -266,7 +266,7 @@ bool Lexer::ReadByteX(char *byte) {
 }
 
 bool Lexer::EatWhiteSpace() {
-	while (isspace(*cur_) && !Eof()) {
+	while (!Eof() && isspace(*cur_)) {
 		if (*cur_++ == '\n')
 			++line_;
 	}

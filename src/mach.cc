@@ -139,7 +139,8 @@ inline Object *SequenceToExpr(Object *seq, ObjectManagement *obm_) {
 //-----------------------------------------------------------------------------
 Mach::Mach() 
 	: global_env_(nullptr)
-	, error_(0) {
+	, error_(0)
+	, call_level_(0) {
 }
 
 Mach::~Mach() {
@@ -189,6 +190,10 @@ bool Mach::Init() {
 
 		// File
 		{ "load", &Mach::Load, },
+
+		// Ajimu extensions:
+		{ "ajimu.gc.allocated", &Mach::AjimuGcAllocated, },
+		{ "ajimu.gc.state", &Mach::AjimuGcState, },
 	};
 
 	obm_.reset(new ObjectManagement());
@@ -249,14 +254,27 @@ Object *Mach::EvalFile(const char *name) {
 	lex.Feed(buf.get(), size);
 	Object *o, *rv;
 	while ((o = lex.Next()) != nullptr) {
-		rv = Eval(o, GlobalEnvironment());
+		//rv = Eval(o, GlobalEnvironment());
+		rv = EvalProtected(o);
 		if (!rv)
 			return nullptr;
 	}
 	return rv;
 }
 
+Object *Mach::EvalProtected(Object *expr) {
+	Object *rv = Eval(expr, GlobalEnvironment());
+	if (!rv)
+		return nullptr;
+	obm_->GcTick(rv, expr);
+	return rv;
+}
+
 Object *Mach::Eval(Object *expr, Environment *env) {
+	/*if (call_level_ == 0)
+		obm_->GcTick(expr); //GC Tick*/
+
+	utils::ScopedCounter<int> counter(&call_level_);
 tailcall:
 	// Sample statement
 	if (IsSelfEvaluating(expr))
@@ -296,6 +314,7 @@ tailcall:
 		// cadr: let bings
 		Object *operands = BindingsArgs(cadr(expr), obm_.get());
 		expr = obm_->Cons(operators, operands);
+		// obm_->GcTick();
 		goto tailcall;
 	}
 
@@ -360,6 +379,7 @@ tailcall:
 			if (fn == kEval) {
 				expr = car(args);
 				// TODO env  = MakeEnvironment() cadr
+				// obm_->GcTick();
 				goto tailcall;
 			}
 			return (this->*fn)(args);
@@ -368,6 +388,7 @@ tailcall:
 			env = ExtendEnvironment(proc->Params(), args, proc->Environment());
 			// Make begin block
 			expr = obm_->Cons(Kof(BeginSymbol), proc->Body());
+			// obm_->GcTick();
 			goto tailcall;
 		}
 		RaiseError("Unknown procedure type.");
@@ -429,6 +450,7 @@ Object *Mach::ListOfValues(Object *operand, Environment *env) {
 		return nullptr;
 	// cdr: rest operands
 	return obm_->Cons(first, ListOfValues(cdr(operand), env));
+	//obm_->GcTick();
 }
 
 Object *Mach::ExpandClauses(Object *clauses) {
@@ -726,6 +748,28 @@ Object *Mach::IsByteVector(Object *args) {
 Object *Mach::IsProcedure(Object *args) {
 	return car(args)->IsPrimitive() ||
 		car(args)->IsClosure() ? Kof(True) : Kof(False);
+}
+
+//
+// Extension Primitive Procedures:
+//
+Object *Mach::AjimuGcAllocated(Object * /*args*/) {
+	long long rv = obm_->AllocatedSize();
+	return obm_->NewFixed(rv);
+}
+
+Object *Mach::AjimuGcState(Object * /*args*/) {
+	static const char *kState[] = {
+		"pause",
+		"propagate",
+		"sweep-environment",
+		"sweep",
+		"finalize",
+	};
+	int state = obm_->GcState();
+	DCHECK_LT(state,
+			static_cast<int>(sizeof(kState)/sizeof(kState[0])));
+	return obm_->NewSymbol(kState[state]);
 }
 
 #undef Kof

@@ -3,6 +3,7 @@
 
 #include "object.h"
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ajimu {
 namespace vm {
@@ -47,9 +48,18 @@ public:
 
 	void Init();
 
+	//
+	// For GC:
+	//
 	size_t AllocatedSize() const {
 		return allocated_;
 	}
+
+	int GcState() const {
+		return gc_state_;
+	}
+
+	void GcTick(Object *rv, Object *expr);
 
 	//
 	// For Environment allocating:
@@ -118,8 +128,6 @@ private:
 
 	Object *AllocateObject(Type type);
 
-	void CollectingTick();
-
 	void MarkObject(Object *o);
 
 	void MarkEnvironment(vm::Environment *env);
@@ -127,6 +135,14 @@ private:
 	void SweepEnvironment();
 
 	void SweepObject();
+
+	bool ShouldMark(const Reachable *o) {
+		return !o->IsBlack() && !o->TestWhite(white_flag_);
+	}
+
+	void Mark(Reachable *o) {
+		if (ShouldMark(o)) o->ToBlack();
+	}
 
 	vm::Environment *gc_root_;
 	Object *constant_[kMax];
@@ -144,6 +160,9 @@ private:
 	// Environment in gc
 	Reachable  env_list_;
 	size_t env_mark_;
+
+	// For debugging
+	std::unordered_set<void*> freed_;
 }; // class ObjectManagement
 
 //#define OBM(method) \

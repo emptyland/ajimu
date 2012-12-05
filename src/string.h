@@ -76,11 +76,6 @@ private:
 		core_ = nullptr;
 	}
 
-	void Drop() {
-		DCHECK_GT(core_->ref, 0);
-		if (--core_->ref == 0 && !InPool()) Free();
-	}
-
 	struct String *core_;
 }; // class StringHandle
 

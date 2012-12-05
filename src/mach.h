@@ -50,9 +50,15 @@ public:
 
 	values::Object *Feed(const char *input);
 
+	// Eval a file
 	values::Object *EvalFile(const char *filename);
 
+	// Safe eval
+	values::Object *EvalProtected(values::Object *expr);
+
+	// Primitive eval
 	values::Object *Eval(values::Object *expr, Environment *env);
+
 
 private:
 	Mach(const Mach &) = delete;
@@ -110,11 +116,16 @@ private:
 	values::Object *IsByteVector(values::Object *args);
 	values::Object *IsProcedure(values::Object *args);
 
+	// Extension Primitive Procedures:
+	values::Object *AjimuGcAllocated(values::Object *args);
+	values::Object *AjimuGcState(values::Object *args);
+
 	std::unique_ptr<values::ObjectManagement> obm_;
 	std::unique_ptr<Lexer> lex_;
 	std::vector<Observer> observer_;
 	Environment *global_env_;
 	int error_;
+	int call_level_;
 }; // class Mach
 
 } // namespace vm

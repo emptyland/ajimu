@@ -56,6 +56,27 @@ private:
 	void operator = (const Handle &) = delete;
 };
 
+// Scoped Counter.
+template<class T>
+class ScopedCounter {
+public:
+	ScopedCounter(T *ptr)
+		: ref_(ptr) {
+		++(*ref_);
+	}
+
+	~ScopedCounter() {
+		--(*ref_);
+	}
+
+private:
+	ScopedCounter() = delete;
+	ScopedCounter(const ScopedCounter &) = delete;
+	void operator = (const ScopedCounter &) = delete;
+
+	T *ref_;
+};
+
 // String utils:
 std::string Formatf(const char *fmt, ... ) {
 	char buf[1024] = {0};

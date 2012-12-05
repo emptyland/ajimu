@@ -11,7 +11,7 @@ std::string PrimitiveValue2String(Object *o);
 Object::~Object() {
 	switch (OwnedType()) {
 	case STRING: 
-		String().Drop();
+		String().Free();
 		break;
 	case SYMBOL:
 		delete[] symbol_.name;

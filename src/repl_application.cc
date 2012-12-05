@@ -54,10 +54,8 @@ bool ReplApplication::Init() {
 	return ok;
 }
 
-bool ReplApplication::Load(const char *lib) {
-	// TODO:
-	(void)lib;
-	return false;
+values::Object *ReplApplication::Load(const char *lib) {
+	return mach_->EvalFile(lib);
 }
 
 int ReplApplication::Run() {
@@ -69,7 +67,8 @@ int ReplApplication::Run() {
 		o = mach_->Lex()->Next();
 		if (!o)
 			continue;
-		rv = mach_->Eval(o, mach_->GlobalEnvironment());
+		//rv = mach_->Eval(o, mach_->GlobalEnvironment());
+		rv = mach_->EvalProtected(o);
 		if (!rv)
 			continue;
 		Print(rv);

@@ -40,7 +40,7 @@ public:
 		output_ = DCHECK_NOTNULL(fp);
 	}
 
-	bool Load(const char *lib);
+	values::Object *Load(const char *lib);
 
 	int Run();
 
