@@ -4,3 +4,4 @@ tags
 *.so
 *.dblite
 *_test
+src/ajimu

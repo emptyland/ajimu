@@ -25,4 +25,16 @@ DefAllTest('''object
 	mach
 	repl_application'''.split())
 
+env.Program("ajimu",
+		'''
+		main.cc
+		mach.cc
+		lexer.cc
+		object.cc
+		object_management.cc
+		repl_application.cc
+		eval_application.cc
+		'''.split(),
+		LIBS='glog gflags pthread'.split(),
+		CPPFLAGS='-std=c++11');
 

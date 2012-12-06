@@ -70,7 +70,11 @@ public:
 
 	vm::Environment *TEST_NewEnvironment(vm::Environment *top);
 
-	Object *Constant(Constants i);
+	Object *Constant(Constants i) const;
+
+	bool Null(const Object *o) const {
+		return DCHECK_NOTNULL(o) == Constant(kEmptyList);
+	}
 
 	//
 	// New objects:

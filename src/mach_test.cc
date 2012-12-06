@@ -222,7 +222,7 @@ TEST_F(MachTest, Cond) {
 	ASSERT_EQ(10, ok->Fixed());
 }
 
-TEST_F(MachTest, Load) {
+/*TEST_F(MachTest, Load) {
 	Object *ok = mach_->Feed(
 		"(load \"src/lib/stdlib.scm\")"
 		"(define seq '(0 1 2 3 4 5))"
@@ -232,7 +232,7 @@ TEST_F(MachTest, Load) {
 
 	ok = mach_->Feed("(car (cddr seq))");
 	ASSERT_EQ(2, ok->Fixed());
-}
+}*/
 
 TEST_F(MachTest, Types) {
 	Object *ok = mach_->Feed(
@@ -261,6 +261,31 @@ TEST_F(MachTest, Types) {
 
 	ok = mach_->Feed("(typeof '(1 2))");
 	ASSERT_STREQ("pair", ok->String().c_str());
+}
+
+TEST_F(MachTest, GC) {
+	Object *ok = mach_->Feed(
+		"(define (for-each f l)"
+		"	(if (null? l)"
+		"		#t"
+		"		(begin"
+		"			(f (car l))"
+		"			(for-each f (cdr l)))))"
+	);
+	ASSERT_NE(nullptr, ok);
+
+	int i = 10000;
+	while (i--) {
+		ok = mach_->Feed(
+			"(for-each "
+			"	(lambda (i) "
+			"		(begin "
+			"			(ajimu.gc.state)"
+			"			(ajimu.gc.allocated))) "
+			"	'(1 2 2 3 4 5 6 7 8 9 0))"
+		);
+		ASSERT_NE(nullptr, ok);
+	}
 }
 
 } // namespace vm

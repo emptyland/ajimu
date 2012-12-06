@@ -61,7 +61,7 @@ void ObjectManagement::Init() {
 	gc_started_ = true;
 }
 
-Object *ObjectManagement::Constant(Constants e) {
+Object *ObjectManagement::Constant(Constants e) const {
 	int i = static_cast<int>(e);
 	DCHECK(i >= 0 && i < kMax);
 	return constant_[i];
@@ -199,8 +199,6 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 }
 
 void ObjectManagement::MarkObject(Object *o) {
-	/*DCHECK(freed_.find(o) == freed_.end())
-		<< "Dup freed obj! addr: " << o;*/
 
 	switch (o->OwnedType()) {
 	case SYMBOL:
@@ -231,10 +229,7 @@ void ObjectManagement::MarkObject(Object *o) {
 
 void ObjectManagement::MarkEnvironment(Environment *env) {
 tail:
-	//if (!env->TestInvWhite(white_flag_)) {
 	if (ShouldMark(env)) {
-		/*DCHECK(freed_.find(env) == freed_.end())
-			<< "Dup freed env! addr: " << env;*/
 		env->ToBlack();
 		for (auto elem : env->Variable())
 			MarkObject(elem);

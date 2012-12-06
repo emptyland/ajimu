@@ -191,6 +191,9 @@ bool Mach::Init() {
 		// File
 		{ "load", &Mach::Load, },
 
+		// Error Handling
+		{ "error", &Mach::Error, },
+
 		// Ajimu extensions:
 		{ "ajimu.gc.allocated", &Mach::AjimuGcAllocated, },
 		{ "ajimu.gc.state", &Mach::AjimuGcState, },
@@ -220,7 +223,8 @@ Object *Mach::Feed(const char *input, size_t len) {
 	lex_->Feed(input, len);
 	values::Object *o, *rv = nullptr;
 	while ((o = lex_->Next()) != nullptr) {
-		rv = Eval(o, global_env_);
+		//rv = Eval(o, global_env_);
+		rv = EvalProtected(o);
 		if (!rv)
 			return nullptr;
 	}
@@ -748,6 +752,16 @@ Object *Mach::IsByteVector(Object *args) {
 Object *Mach::IsProcedure(Object *args) {
 	return car(args)->IsPrimitive() ||
 		car(args)->IsClosure() ? Kof(True) : Kof(False);
+}
+
+//
+// Error handling
+//
+Object *Mach::Error(Object *args) {
+	Object *msg = (args != Kof(EmptyList)) ? car(args) : nullptr;
+	RaiseErrorf("Error() : %s",
+			msg ? msg->ToString(obm_.get()).c_str() : "Unspecified error.");
+	return Kof(OkSymbol);
 }
 
 //

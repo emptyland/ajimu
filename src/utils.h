@@ -78,7 +78,7 @@ private:
 };
 
 // String utils:
-std::string Formatf(const char *fmt, ... ) {
+inline std::string Formatf(const char *fmt, ... ) {
 	char buf[1024] = {0};
 	va_list ap;
 	va_start(ap, fmt);

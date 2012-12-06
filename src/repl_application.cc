@@ -25,6 +25,13 @@ namespace app {
 
 #define cEND    "\033[0m"
 
+static const char *kTitle = \
+"   _      _  _ _   _  _  _ \n"
+"  / |    // // /| /| ||  ||\n"
+" //_| __// // //|/|| ||  ||\n"
+"//  |/++/ // //   || |_++_|\n"
+"----------------------------\n";
+
 void *PrimitiveMethod2Pv(values::PrimitiveMethodPtr ptr) {
 	union {
 		values::PrimitiveMethodPtr pfn;
@@ -51,6 +58,8 @@ bool ReplApplication::Init() {
 		return false;
 	mach_->AddObserver(std::bind(
 				&ReplApplication::HandleError, this, _1, _2));
+	fprintf(output_, "%s%s%s",
+			Paint(cGREEN), kTitle, Paint(cEND));
 	return ok;
 }
 
@@ -110,8 +119,6 @@ const char *ReplApplication::Paint(const char *esc) {
 	return "";
 }
 
-#define Kof(i) \
-	(mach_->Obm()->Constant(::ajimu::values::k##i))
 void ReplApplication::Print(values::Object *o) {
 	bool rest = false;
 	switch (o->OwnedType()) {
@@ -146,19 +153,16 @@ void ReplApplication::Print(values::Object *o) {
 				Paint(cEND));
 		break;
 	case values::PAIR:
-		if (o == Kof(EmptyList)) {
+		if (mach_->Obm()->Null(o)) {
 			fprintf(output_, "%snull%s",
 					Paint(cDARK_AZURE), Paint(cEND));
 			return;
 		}
 		fprintf(output_, "%s(%s",
 				Paint(cPURPLE), Paint(cEND));
-		while (o != Kof(EmptyList)) {
+		while (!mach_->Obm()->Null(o)) {
 			if (rest)
 				fputc(' ', output_);
-			/*if (car(o) == o)
-				fputs("...", output_);
-			else*/
 			Print(car(o));
 			o = cdr(o);
 			rest = true;
@@ -201,7 +205,7 @@ void ReplApplication::Prompt(int complete) {
 		fprintf(output_, " %s..%s ", Paint(cYELLOW), Paint(cEND));
 
 }
-#undef Kof
+
 } // namespace app
 } // namespace ajimu
 

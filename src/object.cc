@@ -7,7 +7,6 @@ namespace values {
 
 std::string PrimitiveValue2String(Object *o);
 
-#define Kof(i) obm->Constant(::ajimu::values::k##i)
 Object::~Object() {
 	switch (OwnedType()) {
 	case STRING: 
@@ -34,12 +33,12 @@ std::string Object::ToString(ObjectManagement *obm) {
 	case STRING:
 		return std::move(String().str());
 	case PAIR: {
-			if (this == Kof(EmptyList))
+			if (obm->Null(this))
 				return "null";
 			int i = 0;
 			std::string str("(");
 			Object *o = this;
-			while (o != Kof(EmptyList)) {
+			while (!obm->Null(o)) {
 				if (i++ > 0)
 					str.append(" ");
 				str.append(car(o)->ToString(obm));
@@ -59,7 +58,6 @@ std::string Object::ToString(ObjectManagement *obm) {
 	return "";
 }
 
-#undef Kof
 } // namespace values
 } // namespace ajimu
 

@@ -59,7 +59,6 @@ public:
 	// Primitive eval
 	values::Object *Eval(values::Object *expr, Environment *env);
 
-
 private:
 	Mach(const Mach &) = delete;
 	void operator = (const Mach &) = delete;
@@ -115,6 +114,7 @@ private:
 	values::Object *IsString(values::Object *args);
 	values::Object *IsByteVector(values::Object *args);
 	values::Object *IsProcedure(values::Object *args);
+	values::Object *Error(values::Object *args);
 
 	// Extension Primitive Procedures:
 	values::Object *AjimuGcAllocated(values::Object *args);
