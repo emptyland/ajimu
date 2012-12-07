@@ -223,7 +223,7 @@ bool Mach::Init() {
 	obm_.reset(new ObjectManagement());
 	obm_->Init();
 	// Register primitive proc(s)
-	for (PrimitiveEntry &i : kProcs) {
+	for (const PrimitiveEntry &i : kProcs) {
 		obm_->NewPrimitive(i.name, i.method);
 	}
 	
