@@ -275,7 +275,6 @@ void ObjectManagement::SweepObject() {
 				!o->IsBoolean() && !Null(o)) {
 			p->next_ = x->next_;
 			CollectObject(o);
-			allocated_ -= sizeof(Object);
 			++sweeped;
 			x = p->next_;
 		} else {
@@ -293,6 +292,8 @@ void ObjectManagement::CollectObject(Object *o) {
 		DCHECK(symbol_.find(o->Symbol()) != symbol_.end());
 		symbol_.erase(o->Symbol());
 	}
+	allocated_ -= sizeof(*o);
+	delete o;
 }
 
 } // namespace values
