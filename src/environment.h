@@ -18,7 +18,7 @@ public:
 	class Handle;
 
 	Environment(Environment *top) // Only for test
-		: values::Reachable(nullptr, 0)
+		: values::Reachable(nullptr, values::Reachable::WHITE_BIT0)
 		, top_(top) {
 	}
 

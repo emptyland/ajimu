@@ -15,6 +15,26 @@ namespace vm {
 using ::ajimu::values::Object;
 using ::ajimu::values::ObjectManagement;
 
+template<class T>
+class StackPersisted {
+public:
+	StackPersisted(std::stack<T> *s, const T &val)
+		: stack_(s) {
+		stack_->push(val);
+	}
+
+	~StackPersisted() {
+		DCHECK(!stack_->empty());
+		stack_->pop();
+	}
+
+private:
+	StackPersisted(const StackPersisted &) = delete;
+	void operator = (const StackPersisted &) = delete;
+
+	std::stack<T> *stack_;
+};
+
 inline values::PrimitiveMethodPtr UnsafeCast2Method(intptr_t i) {
 	union {
 		intptr_t n;
@@ -255,6 +275,7 @@ Object *Mach::EvalFile(const char *name) {
 		return nullptr;
 	}
 	// Eval it!
+	StackPersisted<std::string> persisted(&file_level_, name);
 	Lexer lex(obm_.get());
 	lex.Feed(buf.get(), size);
 	Object *o, *rv;
@@ -774,10 +795,11 @@ Object *Mach::AjimuGcAllocated(Object * /*args*/) {
 }
 
 Object *Mach::AjimuGcState(Object * /*args*/) {
-	static const char *kState[] = {
+	static const char *kState[ObjectManagement::kMaxState] = {
 		"pause",
 		"propagate",
 		"sweep-environment",
+		"sweep-string",
 		"sweep",
 		"finalize",
 	};

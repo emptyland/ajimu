@@ -18,8 +18,7 @@ ObjectManagement::ObjectManagement()
 	, white_flag_(Reachable::WHITE_BIT0)
 	, allocated_(0)
 	, obj_list_(nullptr)
-	, env_list_(nullptr)
-	, env_mark_(0) {
+	, env_list_(nullptr) {
 	memset(constant_, 0, sizeof(constant_));
 }
 
@@ -163,12 +162,9 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 			<< " allocated:" << allocated_;
 		break;
 	case kPropagate: // Mark root environment
-		/*if (env_mark_ >= gc_root_->Count()) {
-			env_mark_ = 0;
-			++gc_state_;
-			DLOG(INFO) << "kPropagate -";
-			break;
-		}*/
+		// Mark constants
+		for (auto k : constant_)
+			MarkObject(k);
 		// Mark one slot by one time!
 		for (auto var : gc_root_->Variable())
 			MarkObject(var);
@@ -182,6 +178,8 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 		break;
 	case kSweepString:
 		pool_->Sweep(white_flag_);
+		++gc_state_;
+		DLOG(INFO) << "kSweepString - allocated:" << allocated_;
 		break;
 	case kSweep: // Sweep objects
 		SweepObject();
@@ -201,10 +199,10 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 void ObjectManagement::MarkObject(Object *o) {
 tailcall:
 	switch (o->OwnedType()) {
-	case SYMBOL:
 	case BOOLEAN:
-		// Skip boolean and symbol type
+		// Skip boolean type, beasure it's constant.
 		break;
+	case SYMBOL:
 	case FIXED:
 	case CHARACTER:
 		Mark(o);
@@ -274,11 +272,9 @@ void ObjectManagement::SweepObject() {
 	while (x) {
 		Object *o = static_cast<Object*>(x);
 		if (o->TestInvWhite(white_flag_) &&
-				!o->IsSymbol() &&
-				!o->IsBoolean() &&
-				o != Constant(kEmptyList)) {
+				!o->IsBoolean() && !Null(o)) {
 			p->next_ = x->next_;
-			delete o;
+			CollectObject(o);
 			allocated_ -= sizeof(Object);
 			++sweeped;
 			x = p->next_;
@@ -290,6 +286,13 @@ void ObjectManagement::SweepObject() {
 	}
 	obj_list_ = dummy.next_;
 	DLOG(INFO) << "SweepObject() sweeped:" << sweeped;
+}
+
+void ObjectManagement::CollectObject(Object *o) {
+	if (o->IsSymbol()) {
+		DCHECK(symbol_.find(o->Symbol()) != symbol_.end());
+		symbol_.erase(o->Symbol());
+	}
 }
 
 } // namespace values

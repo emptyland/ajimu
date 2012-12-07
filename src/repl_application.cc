@@ -32,6 +32,9 @@ static const char *kTitle = \
 " //_| __// // //|/|| ||  ||\n"
 "//  |/++/ // //   || |_++_|\n"
 "----------------------------\n";
+static const char *kDesc = \
+"Ajimu scheme shell.\n"
+"Ctrl+D or Ctrl+C for exit.\n";
 
 void *PrimitiveMethod2Pv(values::PrimitiveMethodPtr ptr) {
 	union {
@@ -59,8 +62,8 @@ bool ReplApplication::Init() {
 		return false;
 	mach_->AddObserver(std::bind(
 				&ReplApplication::HandleError, this, _1, _2));
-	fprintf(output_, "%s%s%s",
-			Paint(cGREEN), kTitle, Paint(cEND));
+	fprintf(output_, "%s%s%s%s",
+			Paint(cGREEN), kTitle, Paint(cEND), kDesc);
 	return ok;
 }
 
@@ -191,10 +194,20 @@ void ReplApplication::Print(values::Object *o) {
 }
 
 void ReplApplication::HandleError(const char *err, vm::Mach *sender) {
-	fprintf(output_, "[%sError%s(%s%d%s)] %s\n",
-			Paint(cRED), Paint(cEND),
-			Paint(cYELLOW), sender->Error(), Paint(cEND),
-			err);
+	const char *file = sender->File();
+	if (!file[0]) {
+		fprintf(output_, "[%sError%s(%s%d%s)] %s\n",
+				Paint(cRED), Paint(cEND),
+				Paint(cYELLOW), sender->Error(), Paint(cEND),
+				err);
+	} else {
+		fprintf(output_, "[%sError%s(%s%d%s) %s%s%s:%s%d%s] %s\n",
+				Paint(cRED), Paint(cEND),
+				Paint(cYELLOW), sender->Error(), Paint(cEND),
+				Paint(cBLUE), file, Paint(cEND),
+				Paint(cYELLOW), sender->Line(), Paint(cEND),
+				err);
+	}
 }
 
 void ReplApplication::Prompt(int complete) {

@@ -141,6 +141,8 @@ private:
 
 	void SweepObject();
 
+	void CollectObject(Object *o);
+
 	bool ShouldMark(const Reachable *o) {
 		return !o->IsBlack() && !o->TestWhite(white_flag_);
 	}
@@ -149,8 +151,13 @@ private:
 		if (ShouldMark(o)) o->ToBlack();
 	}
 
+	// All constants
 	Object *constant_[kMax];
+
+	// Symbol table
 	std::unordered_map<std::string, Object*> symbol_;
+
+	// String factory
 	std::unique_ptr<StringPool> pool_;
 
 	// For GC:
@@ -165,7 +172,6 @@ private:
 
 	// Environment in gc
 	Reachable *env_list_;
-	size_t env_mark_;
 }; // class ObjectManagement
 
 } // namespace values

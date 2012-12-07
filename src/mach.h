@@ -4,6 +4,8 @@
 #include <memory>
 #include <functional>
 #include <vector>
+#include <string>
+#include <stack>
 
 namespace ajimu {
 namespace values {
@@ -34,6 +36,10 @@ public:
 
 	int Line() const;
 
+	const char *File() const {
+		return file_level_.empty() ? "" : file_level_.top().c_str();
+	}
+
 	Environment *GlobalEnvironment() {
 		return global_env_;
 	}
@@ -46,6 +52,7 @@ public:
 		return obm_.get();
 	}
 
+	// Feed script for eval
 	values::Object *Feed(const char *input, size_t len);
 
 	values::Object *Feed(const char *input);
@@ -122,6 +129,7 @@ private:
 
 	std::unique_ptr<values::ObjectManagement> obm_;
 	std::unique_ptr<Lexer> lex_;
+	std::stack<std::string> file_level_;
 	std::vector<Observer> observer_;
 	Environment *global_env_;
 	int error_;

@@ -20,8 +20,8 @@ bool EvalApplication::Init() {
 	if (!ok)
 		return false;
 	mach_->AddObserver([this] (const char *err, vm::Mach *sender) {
-		printf("[Error(%d):%d] %s\n",
-			sender->Error(),
+		printf("[Error:%s:%d] %s\n",
+			sender->File(),
 			sender->Line(),
 			err);
 	});
