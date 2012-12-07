@@ -3,6 +3,7 @@
 #include "object.h"
 #include "environment.h"
 #include "lexer.h"
+#include "string.h"
 #include "utils.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -699,7 +700,7 @@ Object *Mach::Load(Object *args) {
 		RaiseError("load : arg0 is not a string.");
 		return nullptr;
 	}
-	const char *name = car(args)->String().c_str();
+	const char *name = car(args)->String()->c_str();
 	return EvalFile(name);
 }
 

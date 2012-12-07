@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "object_management.h"
 #include "object.h"
+#include "string.h"
 #include <stdio.h>
 #include <string>
 
@@ -149,7 +150,7 @@ void ReplApplication::Print(values::Object *o) {
 	case values::STRING:
 		fprintf(output_, "%s\"%s\"%s",
 				Paint(cDARK_RED),
-				o->String().c_str(),
+				o->String()->c_str(),
 				Paint(cEND));
 		break;
 	case values::PAIR:

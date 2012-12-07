@@ -1,5 +1,4 @@
-#include "object_management.cc"
-#include "object.cc"
+#include "object_management.h"
 #include "gmock/gmock.h"
 
 namespace ajimu {

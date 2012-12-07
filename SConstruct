@@ -22,7 +22,7 @@ if os.environ.has_key('CCFLAGS'):
 env = Environment(CC = conf['CC'],
                   CXX = conf['CXX'],
 				  CCFLAGS = conf['CCFLAGS'],
-                  LIBPATH = 'third_party/gflags third_party/gmock third_party/glog'.split(),
+                  LIBPATH = '#src third_party/gflags third_party/gmock third_party/glog'.split(),
 				  platform  = 'posix')
 Export('env')
 SConscript('src/SConscript')

@@ -1,8 +1,4 @@
-#include "repl_application.cc"
-#include "mach.cc"
-#include "lexer.cc"
-#include "object_management.cc"
-#include "object.cc"
+#include "repl_application.h"
 #include "gmock/gmock.h"
 
 namespace ajimu {

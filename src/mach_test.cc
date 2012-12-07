@@ -1,11 +1,14 @@
-#include "mach.cc"
-#include "object_management.cc"
-#include "object.cc"
-#include "lexer.cc"
+#include "mach.h"
+#include "environment.h"
+#include "object.h"
+#include "string.h"
 #include "gmock/gmock.h"
 
 namespace ajimu {
 namespace vm {
+
+using values::Object;
+using values::String;
 
 class MachTest : public ::testing::Test {
 protected:
@@ -216,7 +219,7 @@ TEST_F(MachTest, Cond) {
 	ASSERT_EQ(10, ok->Fixed());
 
 	ok = mach_->Feed("(foo 20)");
-	ASSERT_EQ("Suck my balls!", ok->String().str());
+	ASSERT_EQ("Suck my balls!", ok->String()->str());
 
 	ok = mach_->Feed("(foo 1)");
 	ASSERT_EQ(10, ok->Fixed());
@@ -248,19 +251,19 @@ TEST_F(MachTest, Types) {
 		")"
 		"(typeof 1)"
 	);
-	ASSERT_STREQ("number", ok->String().c_str());
+	ASSERT_STREQ("number", ok->String()->c_str());
 
 	ok = mach_->Feed("(typeof typeof)");
-	ASSERT_STREQ("procedure", ok->String().c_str());
+	ASSERT_STREQ("procedure", ok->String()->c_str());
 
 	ok = mach_->Feed("(typeof 'typeof)");
-	ASSERT_STREQ("symbol", ok->String().c_str());
+	ASSERT_STREQ("symbol", ok->String()->c_str());
 
 	ok = mach_->Feed("(typeof '())");
-	ASSERT_STREQ("null", ok->String().c_str());
+	ASSERT_STREQ("null", ok->String()->c_str());
 
 	ok = mach_->Feed("(typeof '(1 2))");
-	ASSERT_STREQ("pair", ok->String().c_str());
+	ASSERT_STREQ("pair", ok->String()->c_str());
 }
 
 TEST_F(MachTest, GC) {

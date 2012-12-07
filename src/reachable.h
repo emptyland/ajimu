@@ -6,6 +6,7 @@
 namespace ajimu {
 namespace values {
 class ObjectManagement;
+class StringPool;
 
 inline unsigned InvWhite(unsigned white);
 inline unsigned White(unsigned white);
@@ -34,6 +35,7 @@ public:
 	}
 
 	friend class ObjectManagement;
+	friend class StringPool;
 protected:
 	Reachable(Reachable *next, unsigned white)
 		: next_(next)

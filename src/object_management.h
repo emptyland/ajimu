@@ -3,13 +3,14 @@
 
 #include "object.h"
 #include <unordered_map>
-#include <unordered_set>
+#include <memory>
 
 namespace ajimu {
 namespace vm {
 class Environment;
 } // namespace vm
 namespace values {
+class StringPool;
 
 enum Constants {
 	kFalse,
@@ -38,8 +39,10 @@ public:
 		kPause,
 		kPropagate,
 		kSweepEnv,
+		kSweepString,
 		kSweep,
 		kFinalize,
+		kMaxState,
 	};
 
 	ObjectManagement();
@@ -51,9 +54,7 @@ public:
 	//
 	// For GC:
 	//
-	size_t AllocatedSize() const {
-		return allocated_;
-	}
+	size_t AllocatedSize() const;
 
 	int GcState() const {
 		return gc_state_;
@@ -148,29 +149,24 @@ private:
 		if (ShouldMark(o)) o->ToBlack();
 	}
 
-	vm::Environment *gc_root_;
 	Object *constant_[kMax];
 	std::unordered_map<std::string, Object*> symbol_;
+	std::unique_ptr<StringPool> pool_;
 
 	// For GC:
+	vm::Environment *gc_root_;
 	int gc_state_;
 	bool gc_started_;
 	unsigned white_flag_;
 	size_t allocated_;
 
 	// Object in gc
-	Reachable obj_list_;
+	Reachable *obj_list_;
 
 	// Environment in gc
-	Reachable  env_list_;
+	Reachable *env_list_;
 	size_t env_mark_;
-
-	// For debugging
-	std::unordered_set<void*> freed_;
 }; // class ObjectManagement
-
-//#define OBM(method) \
-//	::ajimu::values::ObjectManagement::##method
 
 } // namespace values
 } // namespace ajimu

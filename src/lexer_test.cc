@@ -1,14 +1,15 @@
-#include "lexer.cc"
-#include "object_management.cc"
-#include "object.cc"
+#include "lexer.h"
+#include "object_management.h"
+#include "string.h"
 #include "gmock/gmock.h"
 #include <stdio.h>
 
 namespace ajimu {
 namespace vm {
 
+using values::ObjectManagement;
 using values::Object;
-using values::StringHandle;
+using values::String;
 
 class LexerTest : public ::testing::Test {
 protected:
@@ -166,10 +167,10 @@ TEST_F(LexerTest, String) {
 	lexer_->Feed(input.c_str(), input.size());
 	Object *ob = lexer_->Next();
 	ASSERT_NE(nullptr, ob);
-	StringHandle str(ob->String());
-	ASSERT_STREQ(k, str.c_str());
-	ASSERT_EQ(k, str.str());
-	ASSERT_EQ(strlen(k), str.Length());
+	String *str = ob->String();
+	ASSERT_STREQ(k, str->c_str());
+	ASSERT_EQ(k, str->str());
+	ASSERT_EQ(strlen(k), str->Length());
 }
 
 TEST_F(LexerTest, StringESC) {
@@ -183,8 +184,8 @@ TEST_F(LexerTest, StringESC) {
 	lexer_->Feed(input.c_str(), input.size());
 	Object *ob = lexer_->Next();
 	ASSERT_NE(nullptr, ob);
-	StringHandle str(ob->String());
-	ASSERT_STREQ(e, str.c_str());
+	String *str = ob->String();
+	ASSERT_STREQ(e, str->c_str());
 }
 
 TEST_F(LexerTest, StringX) {
@@ -197,8 +198,8 @@ TEST_F(LexerTest, StringX) {
 	lexer_->Feed(input.c_str(), input.size());
 	Object *ob = lexer_->Next();
 	ASSERT_NE(nullptr, ob);
-	StringHandle ref(ob->String());
-	ASSERT_EQ(e, ref.str());
+	String *ref = ob->String();
+	ASSERT_EQ(e, ref->str());
 }
 
 } // namespace vm

@@ -1,5 +1,6 @@
 #include "object.h"
 #include "object_management.h"
+#include "string.h"
 #include "utils.h"
 
 namespace ajimu {
@@ -9,9 +10,6 @@ std::string PrimitiveValue2String(Object *o);
 
 Object::~Object() {
 	switch (OwnedType()) {
-	case STRING: 
-		String().Free();
-		break;
 	case SYMBOL:
 		delete[] symbol_.name;
 		break;
@@ -31,7 +29,7 @@ std::string Object::ToString(ObjectManagement *obm) {
 	case CHARACTER:
 		return utils::Formatf("%c", Character());
 	case STRING:
-		return std::move(String().str());
+		return std::move(String()->str());
 	case PAIR: {
 			if (obm->Null(this))
 				return "null";

@@ -6,7 +6,7 @@ test_main = env.StaticObject('test_main.cc');
 
 def DefTest(name, obj):
 	env.Program(name + '_test', [obj, test_main],
-		LIBS='glog gflags gmock pthread'.split())
+		LIBS='ajimu glog gflags gmock pthread'.split())
 
 def DefAllTest(name):
 	units = []
@@ -15,26 +15,31 @@ def DefAllTest(name):
 		DefTest(i, o)
 		units.append(o)
 	units.append(test_main)
-	#env.Program('all_test', units,
-	#	LIBS='glog gflags gmock pthread'.split())
+	env.Program('all_test', units,
+		LIBS='ajimu glog gflags gmock pthread'.split())
+
+env.Library('ajimu',
+	'''
+	mach.cc
+	lexer.cc
+	object.cc
+	object_management.cc
+	repl_application.cc
+	eval_application.cc
+	string_pool.cc
+	'''.split(),
+	CPPFLAGS='-std=c++11');
 
 DefAllTest('''object
 	object_management
 	lexer
 	environment
 	mach
-	repl_application'''.split())
+	repl_application
+	string_pool'''.split())
 
-env.Program("ajimu",
-		'''
-		main.cc
-		mach.cc
-		lexer.cc
-		object.cc
-		object_management.cc
-		repl_application.cc
-		eval_application.cc
-		'''.split(),
-		LIBS='glog gflags pthread'.split(),
-		CPPFLAGS='-std=c++11');
+env.Program('ajimu', 'main.cc',
+	LIBS='ajimu glog gflags pthread'.split(),
+	CPPFLAGS='-std=c++11');
 
+env.Depends('ajimu', 'libajimu.a')

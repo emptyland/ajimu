@@ -3,7 +3,6 @@
 
 #include "reachable.h"
 #include "glog/logging.h"
-#include "string.h"
 #include <string>
 
 namespace ajimu {
@@ -14,6 +13,7 @@ class Environment;
 namespace values {
 class ObjectManagement;
 class Object;
+class String;
 
 enum Type {
 	BOOLEAN,
@@ -50,12 +50,16 @@ public:
 		DCHECK(IsCharacter()); return character_;
 	}
 
-	StringHandle String() const {
-		DCHECK(IsString()); return StringHandle(string_);
+	class String *String() const {
+		DCHECK(IsString()); return string_;
 	}
 
 	const char *Symbol() const {
 		DCHECK(IsSymbol()); return symbol_.name;
+	}
+
+	class String *SymbolO() const {
+		DCHECK(IsSymbol()); return nullptr;
 	}
 
 	int SymbolIndex() const {
@@ -114,12 +118,12 @@ private:
 		char character_;
 
 		// Pooled String
-		struct String *string_;
+		class String *string_;
 
 		// Symbol : name > symbol literal
 		//        : index > fast index
 		struct {
-			const char *name;
+			char *name;
 			int index;
 		} symbol_;
 

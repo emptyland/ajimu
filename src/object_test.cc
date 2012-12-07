@@ -1,5 +1,4 @@
-#include "object.cc"
-#include "object_management.cc"
+#include "object.h"
 #include "gmock/gmock.h"
 #include "glog/logging.h"
 

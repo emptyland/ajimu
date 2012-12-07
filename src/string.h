@@ -1,83 +1,98 @@
 #ifndef AJIMU_VALUES_STRING_H
 #define AJIMU_VALUES_STRING_H
 
+#include "reachable.h"
 #include "glog/logging.h"
 #include <stddef.h>
+#include <string.h>
 #include <string>
+#include <memory>
 
 namespace ajimu {
 namespace values {
-//class ObjectManagement;
-class Object;
 
-struct String {
-	int    ref;
-	size_t hash;
-	size_t len;
-	char   land[1]; // Variable array
-}; // Pure POD type
-
-class StringHandle {
+class String : public Reachable {
 public:
 	enum {
 		MAX_POOL_STRING_LEN = 160,
 	};
 
-	StringHandle(String *core)
-		: core_(DCHECK_NOTNULL(core)) {
-	}
-
 	const char *c_str() const {
-		return core_->land;
+		return Data();
 	}
 
 	std::string str() const {
-		return std::move(std::string(core_->land, core_->len));
+		return std::move(std::string(Data(), Length()));
 	}
 
-	// Lazy hash compute
-	size_t Hash() const {
-		if (core_->hash == 0)
-			core_->hash = ToHash(*core_);
-		return core_->hash;
+	const char *Data() const {
+		return land_;
+	}
+
+	size_t Hash() {
+		if (hash_ == 0U)
+			hash_ = ToHash(Data(), Length());
+		return hash_;
 	}
 
 	size_t Length() const {
-		return core_->len;
+		return len_;
 	}
 
-	bool InPool() const {
-		return Length() <= MAX_POOL_STRING_LEN;
+	size_t Allocated() const {
+		return Length() + sizeof(String);
 	}
 
-	static String *New(const char *raw, size_t len) {
-		size_t size = sizeof(String) + len;
-		String *rv = reinterpret_cast<String *>(new char[size]);
-		rv->ref  = 1;
-		rv->hash = 0;
-		rv->len  = len;
-		memcpy(rv->land, raw, len); rv->land[len] = 0;
+	bool Equal(const char *raw, size_t len) const {
+		return memcmp(Data(), raw, len) == 0;
+	}
+
+	static String *New(const char *naked, size_t len,
+			Reachable *next, unsigned white) {
+		void *blob = new char[sizeof(String) + len + 1];
+		return ::new (blob) String(naked, len, next, white);
+	}
+
+	static String *New(const char *naked,
+			Reachable *next, unsigned white) {
+		return New(naked, strlen(naked), next, white);
+	}
+
+	static size_t Delete(const String *o) {
+		union {
+			const char   *raw;
+			const String *obj;
+		};
+		size_t rv = o->Allocated();
+		obj = o;
+		obj->~String();
+		delete[] raw;
 		return rv;
 	}
 
-	static size_t ToHash(const String &core) {
-		long i = static_cast<long>(core.len);
-		const char *z = core.land;
+	static size_t ToHash(const char *z, size_t len) {
 		size_t n = 1315423911U;
-		while(i--)
+		while(len--)
 			n ^= ((n << 5) + (*z++) + (n >> 2));
 		return n | 1;
 	}
 
-	friend class Object;
 private:
-	void Free() {
-		delete[] (reinterpret_cast<char *>(core_));
-		core_ = nullptr;
+	String(const String &) = delete;
+	void operator = (const String &) = delete;
+
+	String(const char *naked, size_t len, Reachable *next, unsigned white)
+		: Reachable(next, white)
+		, hash_(0)
+		, len_(len) {
+		memcpy(land_, naked, len);
+		land_[len] = '\0';
 	}
 
-	struct String *core_;
-}; // class StringHandle
+	size_t hash_;
+	size_t len_;
+	char land_[1]; // MUST to last one!
+};
 
 } // namespace values
 } // namespace ajimu

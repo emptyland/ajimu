@@ -1,5 +1,7 @@
 #include "object_management.h"
 #include "environment.h"
+#include "string_pool.h"
+#include "string.h"
 #include "glog/logging.h"
 #include <string.h>
 
@@ -9,26 +11,27 @@ namespace values {
 using vm::Environment;
 
 ObjectManagement::ObjectManagement()
-	: gc_root_(nullptr)
+	: pool_(new StringPool)
+	, gc_root_(nullptr)
 	, gc_state_(kPause)
 	, gc_started_(false)
 	, white_flag_(Reachable::WHITE_BIT0)
 	, allocated_(0)
-	, obj_list_(nullptr, white_flag_)
-	, env_list_(nullptr, white_flag_)
+	, obj_list_(nullptr)
+	, env_list_(nullptr)
 	, env_mark_(0) {
 	memset(constant_, 0, sizeof(constant_));
 }
 
 ObjectManagement::~ObjectManagement() {
 	Reachable *i, *p;
-	i = obj_list_.next_;
+	i = obj_list_;
 	while (i) {
 		p = i;
 		i = i->next_;
 		delete static_cast<Object*>(p);
 	}
-	i = env_list_.next_;
+	i = env_list_;
 	while (i) {
 		p = i;
 		i = i->next_;
@@ -61,6 +64,10 @@ void ObjectManagement::Init() {
 	gc_started_ = true;
 }
 
+size_t ObjectManagement::AllocatedSize() const {
+	return allocated_ + pool_->Allocated();
+}
+
 Object *ObjectManagement::Constant(Constants e) const {
 	int i = static_cast<int>(e);
 	DCHECK(i >= 0 && i < kMax);
@@ -84,18 +91,8 @@ Object *ObjectManagement::NewSymbol(const std::string &raw) {
 }
 
 Object *ObjectManagement::NewString(const char *raw, size_t len) {
-	union {
-		String *to_str;
-		char   *to_psz;
-	};
-	to_psz = new char[len + 1 + sizeof(String)];
-	to_str->hash = 0;
-	to_str->len  = len;
-	memcpy(to_str->land, raw, len);
-	to_str->land[len] = '\0';
-
 	Object *o = AllocateObject(STRING);
-	o->string_ = to_str;
+	o->string_ = pool_->NewString(raw, len, white_flag_);
 	return o;
 }
 
@@ -125,24 +122,24 @@ Environment *ObjectManagement::NewEnvironment(Environment *top) {
 	}
 	allocated_ += sizeof(Environment);
 
-	auto env = new Environment(top, env_list_.next_, white_flag_);
-	env_list_.next_ = env; // Linked to environment list.
+	auto env = new Environment(top, env_list_, white_flag_);
+	env_list_ = env; // Linked to environment list.
 	return env;
 }
 
 Environment *ObjectManagement::TEST_NewEnvironment(vm::Environment *top) {
 	allocated_ += sizeof(Environment);
 
-	auto env = new Environment(top, env_list_.next_, white_flag_);
-	env_list_.next_ = env; // Linked to environment list.
+	auto env = new Environment(top, env_list_, white_flag_);
+	env_list_ = env; // Linked to environment list.
 	return env;
 }
 
 Object *ObjectManagement::AllocateObject(Type type) {
 	allocated_ += sizeof(Object);
 
-	Object *o = new Object(type, obj_list_.next_, white_flag_);
-	obj_list_.next_ = o; // Linked to object list.
+	Object *o = new Object(type, obj_list_, white_flag_);
+	obj_list_= o; // Linked to object list.
 	return o;
 }
 
@@ -183,6 +180,9 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 		++gc_state_;
 		DLOG(INFO) << "kSweepEnv - allocated:" << allocated_;
 		break;
+	case kSweepString:
+		pool_->Sweep(white_flag_);
+		break;
 	case kSweep: // Sweep objects
 		SweepObject();
 		++gc_state_;
@@ -199,7 +199,7 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 }
 
 void ObjectManagement::MarkObject(Object *o) {
-
+tailcall:
 	switch (o->OwnedType()) {
 	case SYMBOL:
 	case BOOLEAN:
@@ -207,7 +207,12 @@ void ObjectManagement::MarkObject(Object *o) {
 		break;
 	case FIXED:
 	case CHARACTER:
+		Mark(o);
+		break;
 	case STRING:
+		Mark(o);
+		Mark(o->String());
+		break;
 	case PRIMITIVE:
 		Mark(o);
 		break;
@@ -221,80 +226,69 @@ void ObjectManagement::MarkObject(Object *o) {
 		if (o != Constant(kEmptyList)) {
 			Mark(o);
 			MarkObject(car(o));
-			MarkObject(cdr(o));
+			//MarkObject(cdr(o));
+			o = cdr(o);
+			goto tailcall;
 		}
 		break;
 	}
 }
 
 void ObjectManagement::MarkEnvironment(Environment *env) {
-tail:
+tailcall:
 	if (ShouldMark(env)) {
 		env->ToBlack();
 		for (auto elem : env->Variable())
 			MarkObject(elem);
 	}
 	env = env->Next();
-	if (env) goto tail;
+	if (env) goto tailcall;
 }
 
 void ObjectManagement::SweepEnvironment() {
-	/*Reachable *sweep = env_sweep_;
-	while (sweep->next_) {
-		Reachable *next = sweep->next_;
-		if (next->TestInvWhite(white_flag_)) {
-			sweep->next_ = next->next_;
-			delete static_cast<Environment*>(next);
-			allocated_ -= sizeof(Environment);
-			break;
-		}
-		next->ToWhite(white_flag_);
-		sweep = next;
-	}
-	env_sweep_ = sweep->next_;
-	*/
 	int sweeped = 0;
-	Reachable *sweep = &env_list_;
-	while (sweep->next_) {
-		Reachable *next = sweep->next_;
-		if (next->TestInvWhite(white_flag_)) {
-			// Environment Collected!
-			sweep->next_ = next->next_;
-			freed_.insert(next);
-			delete static_cast<Environment*>(next);
+	Reachable *x = env_list_;
+	Reachable dummy(x, white_flag_), *p = &dummy;
+	while (x) {
+		if (x->TestInvWhite(white_flag_)) {
+			// Environment collection:
+			p->next_ = x->next_;
+			delete static_cast<Environment*>(x);
 			allocated_ -= sizeof(Environment);
-			sweep = sweep->next_;
 			++sweeped;
+			x = p->next_;
 		} else {
-			next->ToWhite(white_flag_);
-			sweep = next;
+			x->ToWhite(white_flag_);
+			p = x;
+			x = x->next_;
 		}
 	}
-	DLOG(INFO) << "SweepEnvironment() sweeped:" << sweeped;
+	env_list_ = dummy.next_;
+	DLOG(INFO) << "SweepEnvironment() xed:" << sweeped;
 }
 
 void ObjectManagement::SweepObject() {
-	Reachable *sweep = &obj_list_;
 	int sweeped = 0;
-	while (sweep->next_) {
-		Object *next = static_cast<Object*>(sweep->next_);
-		if (next->TestInvWhite(white_flag_) &&
-				!next->IsSymbol() &&
-				!next->IsBoolean() &&
-				next != Constant(kEmptyList)) {
-			// Object Collected!
-			sweep->next_ = next->next_;
-			freed_.insert(next);
-			delete next;
+	Reachable *x = obj_list_;
+	Reachable dummy(x, white_flag_), *p = &dummy;
+	while (x) {
+		Object *o = static_cast<Object*>(x);
+		if (o->TestInvWhite(white_flag_) &&
+				!o->IsSymbol() &&
+				!o->IsBoolean() &&
+				o != Constant(kEmptyList)) {
+			p->next_ = x->next_;
+			delete o;
 			allocated_ -= sizeof(Object);
-			sweep = sweep->next_;
 			++sweeped;
+			x = p->next_;
 		} else {
-			if (next->IsBlack())
-				next->ToWhite(white_flag_);
-			sweep = next;
+			x->ToWhite(white_flag_);
+			p = x;
+			x = x->next_;
 		}
 	}
+	obj_list_ = dummy.next_;
 	DLOG(INFO) << "SweepObject() sweeped:" << sweeped;
 }
 
