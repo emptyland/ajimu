@@ -99,6 +99,12 @@ public:
 		return o;
 	}
 
+	Object *NewFloat(double value) {
+		Object *o = AllocateObject(FLOAT);
+		o->float_ = value;
+		return o;
+	}
+
 	Object *NewBoolean(bool value) {
 		Object *o = AllocateObject(BOOLEAN);
 		o->boolean_ = value;

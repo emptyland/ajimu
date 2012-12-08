@@ -53,14 +53,16 @@ Object *Lexer::Next() {
 		case '-': case '+':
 			if (IsDelimiter(cur_[1]))
 				return ReadSymbol();
-			return ReadFixed();
+			return ReadNumber();
+		case '.':
+			return ReadFloat(0LL, +1);
 		case '\'':
 			++cur_;
 			return obm_->Cons(Kof(QuoteSymbol),
 					obm_->Cons(Next(), Kof(EmptyList)));
 		default:
 			if (isdigit(*cur_))
-				return ReadFixed();
+				return ReadNumber();
 			else if (IsInitial(*cur_))
 				return ReadSymbol();
 			RaiseErrorf("Unknown token. char: \"%c\"", *cur_);
@@ -131,7 +133,7 @@ Object *Lexer::ReadPair() {
 	return obm_->Cons(car, cdr);
 }
 
-Object *Lexer::ReadFixed() {
+Object *Lexer::ReadNumber() {
 	long long sign = 1;
 	if (*cur_ == '-') {
 		++cur_; sign = -1;
@@ -142,12 +144,34 @@ Object *Lexer::ReadFixed() {
 	while (!IsDelimiter(*cur_) && !Eof()) {
 		if (isdigit(*cur_)) {
 			num = (num * 10) + (*cur_++ - '0');
+		} else if (*cur_ == '.') {
+			return ReadFloat(num, sign);
 		} else {
 			RaiseError("Unexpected digit character.");
 			return nullptr;
 		}
 	}
 	return ExpectDelimiter() ? obm_->NewFixed(num * sign) : nullptr;
+}
+
+Object *Lexer::ReadFloat(long long initial, int sign) {
+	++cur_; // Skip `.'
+	char literal[1024] = {0};
+	snprintf(literal, sizeof(literal),
+			sign < 0 ? "-%lld." : "%lld.", initial);
+
+	size_t p = strlen(literal);
+	while (!IsDelimiter(*cur_) && !Eof()) {
+		if (isdigit(*cur_)) {
+			literal[p++] = *cur_++;
+		} else {
+			RaiseError("Unexpected digit character for float number.");
+			return nullptr;
+		}
+	}
+	literal[p] = '\0';
+	return ExpectDelimiter() ?
+		obm_->NewFloat(atof(literal)) : nullptr;
 }
 
 Object *Lexer::ReadSymbol() {

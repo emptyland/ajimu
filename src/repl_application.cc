@@ -143,6 +143,12 @@ void ReplApplication::Print(values::Object *o) {
 				o->Fixed(),
 				Paint(cEND));
 		break;
+	case values::FLOAT:
+		fprintf(output_, "%s%lf%s",
+				Paint(cDARK_AZURE),
+				o->Float(),
+				Paint(cEND));
+		break;
 	case values::CHARACTER:
 		fprintf(output_, "%s#%c%s",
 				Paint(cDARK_RED),

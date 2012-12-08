@@ -35,7 +35,9 @@ public:
 
 	values::Object *ReadCharacter();
 
-	values::Object *ReadFixed();
+	values::Object *ReadNumber();
+
+	values::Object *ReadFloat(long long initial, int sign);
 
 	values::Object *ReadSymbol();
 
@@ -46,6 +48,10 @@ public:
 	int Line() const { return line_; }
 
 	bool EatWhiteSpace();
+
+	const char *TEST_Current() const {
+		return cur_;
+	}
 
 	static bool IsDelimiter(int c);
 

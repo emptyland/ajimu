@@ -62,6 +62,7 @@ inline bool IsSelfEvaluating(Object *expr) {
 	switch (expr->OwnedType()) {
 	case values::BOOLEAN:
 	case values::FIXED:
+	case values::FLOAT:
 	case values::CHARACTER:
 	case values::STRING:
 		return true;
@@ -208,7 +209,8 @@ bool Mach::Init() {
 		{ "port?",    &Mach::IsPort,    },
 		{ "null?",    &Mach::IsNull,    },
 		{ "pair?",    &Mach::IsPair,    },
-		{ "number?",  &Mach::IsNumber,  },
+		{ "integer?", &Mach::IsInteger, },
+		{ "float?",   &Mach::IsFloat,   },
 		{ "string?",  &Mach::IsString,  },
 		{ "bytevector?", &Mach::IsByteVector, },
 		{ "procedure?",  &Mach::IsProcedure,  },
@@ -575,103 +577,153 @@ void Mach::RaiseErrorf(const char *fmt, ...) {
 //
 // Primitive Proc(s)
 //
+//
+#define EXPECT_NUMBER(proc, idx) \
+	if (!car(args)->IsFixed() && \
+			!car(args)->IsFloat()) { \
+		RaiseErrorf(proc ": Unexpected type: arg%d, expected fixednum.",\
+				idx); \
+		return nullptr; \
+	} (void)0
+
 Object *Mach::Add(Object *args) {
-	long long rv = 0;
-	int i = 0;
+	long long rvi = 0;
+	double    rvf = 0;
+	bool      isf  = false;
+	int       i = 0;
 	while (args != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("+ : Unexpected type: arg%d, expected fixednum.", i);
-			return nullptr;
+		EXPECT_NUMBER("+", i);
+
+		if (!isf)
+			isf = car(args)->IsFloat();
+		if (isf) {
+			if (rvi) {
+				rvf = rvi; rvi = 0LL;
+			}
+			rvf += car(args)->ToFloat();
+		} else {
+			rvi += car(args)->Fixed();
 		}
-		rv += car(args)->Fixed();
 		args = cdr(args);
 		++i;
 	}
-	return obm_->NewFixed(rv);
+	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::Dec(Object *args) {
-	long long rv = car(args)->Fixed();
-	int i = 0;
+	long long rvi = 0LL;
+	double    rvf = 0.0f;
+	bool      isf = car(args)->IsFloat();
+	int       i = 1;
+	EXPECT_NUMBER("-", i);
+	if (isf)
+		rvf = car(args)->Float();
+	else
+		rvi = car(args)->Fixed();
 	while ((args = cdr(args)) != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("- : Unexpected type: arg%d, expected fixednum.", i);
-			return nullptr;
+		EXPECT_NUMBER("-", i);
+
+		if (!isf)
+			isf = car(args)->IsFloat();
+		if (isf) {
+			if (rvi) {
+				rvf = rvi; rvi = 0LL;
+			}
+			rvf -= car(args)->ToFloat();
+		} else {
+			rvi -= car(args)->Fixed();
 		}
-		rv -= car(args)->Fixed();
 		++i;
 	}
-	return obm_->NewFixed(rv);
+	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::Mul(Object *args) {
-	long long rv = 1;
-	int i = 0;
-	while (args != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("* : Unexpected type: arg%d, expected fixednum.", i);
-			return nullptr;
+	long long rvi = 0LL;
+	double    rvf = 0.0f;
+	bool      isf = car(args)->IsFloat();
+	int       i = 1;
+	EXPECT_NUMBER("*", i);
+	if (isf)
+		rvf = car(args)->Float();
+	else
+		rvi = car(args)->Fixed();
+	while ((args = cdr(args)) != Kof(EmptyList)) {
+		EXPECT_NUMBER("*", i);
+
+		if (!isf)
+			isf = car(args)->IsFloat();
+		if (isf) {
+			if (rvi) {
+				rvf = rvi; rvi = 0LL;
+			}
+			rvf *= car(args)->ToFloat();
+		} else {
+			rvi *= car(args)->Fixed();
 		}
-		rv *= car(args)->Fixed();
-		args = cdr(args);
 		++i;
 	}
-	return obm_->NewFixed(rv);
+	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::Div(Object *args) {
-	long long rv = car(args)->Fixed();
-	int i = 0;
+	long long rvi = 0LL;
+	double    rvf = 0.0f;
+	bool      isf = car(args)->IsFloat();
+	int       i = 1;
+	EXPECT_NUMBER("/", i);
+	if (isf)
+		rvf = car(args)->Float();
+	else
+		rvi = car(args)->Fixed();
 	while ((args = cdr(args)) != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("/ : Unexpected type: arg%d, expected fixednum.", i);
+		EXPECT_NUMBER("/", i);
+
+		if (car(args)->ToFloat() == 0.0) {
+			RaiseErrorf("div : Can not divide by zero, in arg%d.", i);
 			return nullptr;
 		}
-		if (car(args)->Fixed() == 0) {
-			RaiseError("/ : Div zeor!");
-			return nullptr;
+		if (!isf)
+			isf = car(args)->IsFloat();
+		if (isf) {
+			if (rvi) {
+				rvf = rvi; rvi = 0LL;
+			}
+			rvf /= car(args)->ToFloat();
+		} else {
+			rvi /= car(args)->Fixed();
 		}
-		rv /= car(args)->Fixed();
 		++i;
 	}
-	return obm_->NewFixed(rv);
+	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::NumberEqual(Object *args) {
-	if (!car(args)->IsFixed()) {
-		RaiseError("= : Unexpected type: arg0, expected fixednum.");
-		return nullptr;
-	}
-	long long arg0 = car(args)->Fixed();
-	int i = 1;
+	EXPECT_NUMBER("=", 0);
+
+	double arg0 = car(args)->ToFloat();
+	int    i = 1;
 	while ((args = cdr(args)) != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("= : Unexpected type: arg%d, expected fixednum.", i);
-			return nullptr;
-		}
-		if (arg0 != car(args)->Fixed()) {
+		EXPECT_NUMBER("=", i);
+
+		if (arg0 != car(args)->ToFloat())
 			return Kof(False);
-		}
 		++i;
 	}
 	return Kof(True);
 }
 
 Object *Mach::NumberGreat(Object *args) {
-	if (!car(args)->IsFixed()) {
-		RaiseError("> : Unexpected type: arg0, expected fixednum.");
-		return nullptr;
-	}
-	long long prev = car(args)->Fixed();
-	int i = 1;
+	EXPECT_NUMBER(">", 0);
+
+	double arg0 = car(args)->ToFloat();
+	int    i = 1;
 	while ((args = cdr(args)) != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("> : Unexpected type: arg%d, expected fixednum.", i);
-			return nullptr;
-		}
-		long long next = car(args)->Fixed();
-		if (prev > next)
-			prev = next;
+		EXPECT_NUMBER(">", i);
+
+		double next = car(args)->ToFloat();
+		if (arg0 > car(args)->ToFloat())
+			arg0 = next;
 		else
 			return Kof(False);
 		++i;
@@ -680,26 +732,24 @@ Object *Mach::NumberGreat(Object *args) {
 }
 
 Object *Mach::NumberLess(Object *args) {
-	if (!car(args)->IsFixed()) {
-		RaiseError("< : Unexpected type: arg0, expected fixednum.");
-		return nullptr;
-	}
-	long long prev = car(args)->Fixed();
-	int i = 1;
+	EXPECT_NUMBER("<", 0);
+
+	double arg0 = car(args)->ToFloat();
+	int    i = 1;
 	while ((args = cdr(args)) != Kof(EmptyList)) {
-		if (!car(args)->IsFixed()) {
-			RaiseErrorf("< : Unexpected type: arg%d, expected fixednum.", i);
-			return nullptr;
-		}
-		long long next = car(args)->Fixed();
-		if (prev < next)
-			prev = next;
+		EXPECT_NUMBER("<", i);
+
+		double next = car(args)->ToFloat();
+		if (arg0 < car(args)->ToFloat())
+			arg0 = next;
 		else
 			return Kof(False);
 		++i;
 	}
 	return Kof(True);
 }
+
+#undef EXPECT_NUMBER
 
 Object *Mach::Display(Object *args) {
 	Object *o = car(args);
@@ -788,8 +838,12 @@ Object *Mach::IsPair(Object *args) {
 	return car(args)->IsPair() ? Kof(True) : Kof(False);
 }
 
-Object *Mach::IsNumber(Object *args) {
+Object *Mach::IsInteger(Object *args) {
 	return car(args)->IsFixed() ? Kof(True) : Kof(False);
+}
+
+Object *Mach::IsFloat(Object *args) {
+	return car(args)->IsFloat() ? Kof(True) : Kof(False);
 }
 
 Object *Mach::IsString(Object *args) {

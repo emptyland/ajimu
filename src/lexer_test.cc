@@ -80,7 +80,7 @@ TEST_F(LexerTest, Character) {
 	}
 }
 
-TEST_F(LexerTest, Number) {
+TEST_F(LexerTest, Fixed) {
 	std::string input("-1");
 	lexer_->Feed(input.c_str(), input.size());
 	Object *ob = lexer_->Next();
@@ -97,6 +97,26 @@ TEST_F(LexerTest, Number) {
 		ob = lexer_->Next();
 		ASSERT_TRUE(ob != nullptr) << "Unexpected: " << ll;
 		ASSERT_EQ(ll, ob->Fixed());
+	}
+}
+
+TEST_F(LexerTest, Float) {
+	std::string input("0.1");
+	lexer_->Feed(input.c_str(), input.size());
+	Object *ob = lexer_->Next();
+	ASSERT_EQ(values::FLOAT, ob->OwnedType());
+	ASSERT_DOUBLE_EQ(0.1, ob->Float());
+
+	input = ".1 0.0002 1000.0001 +0.1 -0.1 -100000.00001";
+	static const double expected[] = {
+		0.1, 0.0002, 1000.0001, 0.1, -0.1, -100000.00001,
+	};
+	lexer_->Feed(input.c_str(), input.size());
+	for (double val : expected) {
+		ob = lexer_->Next();
+		ASSERT_NE(nullptr, ob) << "Fail in: " << val
+			<< " Current: " << lexer_->TEST_Current();
+		ASSERT_DOUBLE_EQ(val, ob->Float());
 	}
 }
 

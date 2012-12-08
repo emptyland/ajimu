@@ -1,3 +1,5 @@
+(define (number? obj)
+	(or (integer? obj) (float? obj)))
 
 (define (caar lst) (car (car lst)))
 (define (cadr lst) (car (cdr lst)))

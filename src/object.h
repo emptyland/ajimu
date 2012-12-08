@@ -19,6 +19,7 @@ enum Type {
 	BOOLEAN,
 	SYMBOL,
 	FIXED,
+	FLOAT,
 	CHARACTER,
 	STRING,
 	PAIR,
@@ -40,6 +41,20 @@ public:
 
 	long long Fixed() const {
 		DCHECK(IsFixed()); return fixed_;
+	}
+
+	long long ToFixed() const {
+		DCHECK(IsFixed() || IsFloat());
+		return static_cast<long long>(IsFixed() ? Fixed() : Float());
+	}
+
+	double Float() const {
+		DCHECK(IsFloat()); return float_;
+	}
+
+	double ToFloat() const {
+		DCHECK(IsFixed() || IsFloat());
+		return static_cast<double>(IsFixed() ? Fixed() : Float());
 	}
 
 	bool Boolean() const {
@@ -91,6 +106,7 @@ public:
 	}
 
 	bool IsFixed() const { return OwnedType() == FIXED; }
+	bool IsFloat() const { return OwnedType() == FLOAT; }
 	bool IsBoolean() const { return OwnedType() == BOOLEAN; }
 	bool IsCharacter() const { return OwnedType() == CHARACTER; }
 	bool IsSymbol() const { return OwnedType() == SYMBOL; }
@@ -113,6 +129,9 @@ private:
 
 		// Fixed number
 		long long fixed_;
+	
+		// Float number
+		double float_;
 
 		// 8bit Character
 		char character_;
