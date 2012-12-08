@@ -15,6 +15,7 @@ class Object;
 namespace vm {
 class Lexer;
 class Environment;
+template<class T> class Local;
 
 class Mach {
 public:
@@ -60,9 +61,6 @@ public:
 	// Eval a file
 	values::Object *EvalFile(const char *filename);
 
-	// Safe eval
-	values::Object *EvalProtected(values::Object *expr);
-
 	// Primitive eval
 	values::Object *Eval(values::Object *expr, Environment *env);
 
@@ -86,6 +84,13 @@ private:
 
 	Environment *ExtendEnvironment(values::Object *params,
 			values::Object *args, Environment *base);
+
+	// Operating for local
+	void Push(values::Object *o);
+
+	void Pop(size_t n);
+
+	values::Object *Last(size_t i) const;
 
 	// Error output:
 	void RaiseError(const char *err);
@@ -128,6 +133,8 @@ private:
 	values::Object *AjimuGcState(values::Object *args);
 
 	std::unique_ptr<values::ObjectManagement> obm_;
+	std::unique_ptr<Local<values::Object>> local_val_;
+	std::unique_ptr<Local<Environment>>    local_env_;
 	std::unique_ptr<Lexer> lex_;
 	std::stack<std::string> file_level_;
 	std::vector<Observer> observer_;

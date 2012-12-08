@@ -3,11 +3,14 @@
 
 #include "object.h"
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 
 namespace ajimu {
 namespace vm {
 class Environment;
+template<class T>
+class Local;
 } // namespace vm
 namespace values {
 class StringPool;
@@ -60,7 +63,8 @@ public:
 		return gc_state_;
 	}
 
-	void GcTick(Object *rv, Object *expr);
+	void GcTick(vm::Local<Object> *local,
+			vm::Local<vm::Environment> *env);
 
 	//
 	// For Environment allocating:
@@ -172,6 +176,8 @@ private:
 
 	// Environment in gc
 	Reachable *env_list_;
+
+	std::unordered_set<void*> freed_;
 }; // class ObjectManagement
 
 } // namespace values

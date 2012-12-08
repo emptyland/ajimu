@@ -2,6 +2,7 @@
 #include "object_management.h"
 #include "object.h"
 #include "environment.h"
+#include "local.h"
 #include "lexer.h"
 #include "string.h"
 #include "utils.h"
@@ -35,16 +36,17 @@ private:
 	std::stack<T> *stack_;
 };
 
-inline values::PrimitiveMethodPtr UnsafeCast2Method(intptr_t i) {
+inline values::PrimitiveMethodPtr UnsafeCast2Method(const char *k) {
 	union {
-		intptr_t n;
-		values::PrimitiveMethodPtr fn;
+		const char *input;
+		values::PrimitiveMethodPtr output;
 	};
-	n = i; return fn;
+	input = k;
+	return output;
 }
 
-static auto kApply = UnsafeCast2Method(1);
-static auto kEval =  UnsafeCast2Method(2);
+static auto kApply = UnsafeCast2Method(":apply:");
+static auto kEval =  UnsafeCast2Method(":eval:");
 
 #define Kof(i) obm_->Constant(::ajimu::values::k##i)
 inline bool IsTaggedList(Object *expr, Object *tag) {
@@ -167,6 +169,29 @@ Mach::Mach()
 Mach::~Mach() {
 }
 
+//
+// The local variable operators
+//
+void Mach::Push(Object *o) {
+	local_val_->Push(o);
+}
+
+void Mach::Pop(size_t n) {
+	local_val_->Pop(n);
+}
+
+Object *Mach::Last(size_t i) const {
+	return local_val_->Last(i);
+}
+
+int Mach::Line() const {
+	return lex_->Line();
+}
+
+Object *Mach::Feed(const char *input) {
+	return Feed(input, strlen(input));
+}
+
 bool Mach::Init() {
 	struct PrimitiveEntry {
 		const char *name;
@@ -220,6 +245,9 @@ bool Mach::Init() {
 		{ "ajimu.gc.state", &Mach::AjimuGcState, },
 	};
 
+	local_val_.reset(new Local<Object>());
+	local_env_.reset(new Local<Environment>());
+
 	obm_.reset(new ObjectManagement());
 	obm_->Init();
 	// Register primitive proc(s)
@@ -236,24 +264,15 @@ bool Mach::Init() {
 	return true;
 }
 
-int Mach::Line() const {
-	return lex_->Line();
-}
-
 Object *Mach::Feed(const char *input, size_t len) {
 	lex_->Feed(input, len);
 	values::Object *o, *rv = nullptr;
 	while ((o = lex_->Next()) != nullptr) {
-		//rv = Eval(o, global_env_);
-		rv = EvalProtected(o);
+		rv = Eval(o, global_env_);
 		if (!rv)
 			return nullptr;
 	}
 	return rv;
-}
-
-Object *Mach::Feed(const char *input) {
-	return Feed(input, strlen(input));
 }
 
 Object *Mach::EvalFile(const char *name) {
@@ -280,28 +299,24 @@ Object *Mach::EvalFile(const char *name) {
 	lex.Feed(buf.get(), size);
 	Object *o, *rv;
 	while ((o = lex.Next()) != nullptr) {
-		//rv = Eval(o, GlobalEnvironment());
-		rv = EvalProtected(o);
+		rv = Eval(o, GlobalEnvironment());
 		if (!rv)
 			return nullptr;
 	}
 	return rv;
 }
 
-Object *Mach::EvalProtected(Object *expr) {
-	Object *rv = Eval(expr, GlobalEnvironment());
-	if (!rv)
-		return nullptr;
-	obm_->GcTick(rv, expr);
-	return rv;
-}
-
 Object *Mach::Eval(Object *expr, Environment *env) {
-	/*if (call_level_ == 0)
-		obm_->GcTick(expr); //GC Tick*/
+	utils::ScopedCounter<int>     counter(&call_level_);
+	Local<Object>::Persisted      persisted_val(local_val_.get());
+	Local<Environment>::Persisted persisted_env(local_env_.get());
 
-	utils::ScopedCounter<int> counter(&call_level_);
+newenv:
+	local_env_->Push(env);
 tailcall:
+	local_val_->Push(expr);
+	obm_->GcTick(local_val_.get(), local_env_.get());
+
 	// Sample statement
 	if (IsSelfEvaluating(expr))
 		return expr;
@@ -322,12 +337,14 @@ tailcall:
 			caddr(expr) : // caddr: consequent
 			// if Alternative
 			cdddr(expr) == Kof(EmptyList) ? Kof(False) : cadddr(expr);
+		Pop(1);
 		goto tailcall;
 	}
 
 	// Cond statement
 	if (IsCond(expr, obm_.get())) {
 		expr = ExpandClauses(cdr(expr)); // cdr: cond clauses
+		Pop(1);
 		goto tailcall;
 	}
 
@@ -340,7 +357,7 @@ tailcall:
 		// cadr: let bings
 		Object *operands = BindingsArgs(cadr(expr), obm_.get());
 		expr = obm_->Cons(operators, operands);
-		// obm_->GcTick();
+		Pop(1);
 		goto tailcall;
 	}
 
@@ -358,6 +375,7 @@ tailcall:
 			expr = cdr(expr); // cdr: rest expr
 		}
 		expr = car(expr);
+		Pop(1);
 		goto tailcall;
 	}
 
@@ -374,6 +392,7 @@ tailcall:
 			expr = cdr(expr); // cdr: rest expr
 		}
 		expr = car(expr);
+		Pop(1);
 		goto tailcall;
 	}
 
@@ -386,38 +405,48 @@ tailcall:
 			expr = cdr(expr);     // cdr: rest actions
 		}
 		expr = car(expr);
+		Pop(1);
 		goto tailcall;
 	}
 
 	// Exec block
-	if (expr->IsPair()) { // Is application ?
-		Object *proc = Eval(car(expr), env);         // car: operator
-		if (!proc)
+	if (expr->IsPair()) { // Is application 
+		Push(Eval(car(expr), env)); // proc | car: operator
+		//if (!proc)
+		if (!Last(0)) {
+			Pop(1);
 			return nullptr; // May be error.
-		Object *args = ListOfValues(cdr(expr), env); // cdr: operands
-
-		if (proc->IsPrimitive() && proc->Primitive() == kApply) {
-			proc = car(args);
-			args = PrepareApplyOperands(cdr(args), obm_.get());
 		}
-		if (proc->IsPrimitive()) {
-			auto fn = proc->Primitive();
+		Push(ListOfValues(cdr(expr), env)); // args | cdr: operands
+
+		if (Last(1)->IsPrimitive() && Last(1)->Primitive() == kApply) {
+			Object *args = Last(0);
+			Pop(2); Push(args);
+			Push(car(Last(0))); // proc
+			Push(PrepareApplyOperands(cdr(Last(0)), obm_.get())); // args
+		}
+		if (Last(1)->IsPrimitive()) {
+			auto fn = Last(1)->Primitive();
 			if (fn == kEval) {
-				expr = car(args);
+				expr = car(Last(0));
 				// TODO env  = MakeEnvironment() cadr
-				// obm_->GcTick();
+				Pop(3);
 				goto tailcall;
 			}
-			return (this->*fn)(args);
+			//Push(args);
+			return (this->*fn)(Last(0));
 		}
-		if (proc->IsClosure()) {
-			env = ExtendEnvironment(proc->Params(), args, proc->Environment());
+		if (Last(1)->IsClosure()) {
+			env = ExtendEnvironment(Last(1)->Params(),
+					Last(0),
+					Last(1)->Environment());
 			// Make begin block
-			expr = obm_->Cons(Kof(BeginSymbol), proc->Body());
-			// obm_->GcTick();
-			goto tailcall;
+			expr = obm_->Cons(Kof(BeginSymbol), Last(1)->Body());
+			local_env_->Pop(1);
+			Pop(3);
+			goto newenv;
 		}
-		RaiseError("Unknown procedure type.");
+		RaiseError("Unknown Last(0)edure type.");
 		return nullptr;
 	}
 	RaiseError("Bad eval! no one can be evaluated.");
@@ -467,16 +496,20 @@ Object *Mach::EvalAssignment(Object *expr, Environment *env) {
 }
 
 Object *Mach::ListOfValues(Object *operand, Environment *env) {
-	if (operand == Kof(EmptyList))
+	Local<Object>::Persisted persisted(local_val_.get());
+
+	Push(operand);
+	if (Last(0) == Kof(EmptyList))
 		return Kof(EmptyList);
 
 	 // car: first operand
-	Object *first = Eval(car(operand), env);
-	if (!first)
+	//Object *first = Eval(car(operand), env);
+	Push(Eval(car(Last(0)), env));
+	if (!Last(0))
 		return nullptr;
 	// cdr: rest operands
-	return obm_->Cons(first, ListOfValues(cdr(operand), env));
-	//obm_->GcTick();
+	Push(ListOfValues(cdr(Last(1)), env));
+	return obm_->Cons(Last(1), Last(0));
 }
 
 Object *Mach::ExpandClauses(Object *clauses) {
@@ -515,8 +548,7 @@ Environment *Mach::ExtendEnvironment(Object *params, Object *args,
 			env->Define(car(params)->Symbol(), car(args));
 			args = cdr(args);
 		} else {
-			// TODO: Use `nil' object
-			env->Define(car(params)->Symbol(), nullptr);
+			env->Define(car(params)->Symbol(), Kof(EmptyList));
 		}
 		params = cdr(params);
 	}

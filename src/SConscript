@@ -36,7 +36,8 @@ DefAllTest('''object
 	environment
 	mach
 	repl_application
-	string_pool'''.split())
+	string_pool
+	local'''.split())
 
 env.Program('ajimu', 'main.cc',
 	LIBS='ajimu glog gflags pthread'.split(),

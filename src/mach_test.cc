@@ -277,7 +277,7 @@ TEST_F(MachTest, GC) {
 	);
 	ASSERT_NE(nullptr, ok);
 
-	int i = 10000;
+	int i = 100;
 	while (i--) {
 		ok = mach_->Feed(
 			"(for-each "

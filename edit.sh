@@ -57,7 +57,7 @@ function edit_cxx_file() {
 function edit_test_file() {
 	local header
 	header=$(echo ${2} | sed -e "s/_test$//")
-	echo "#include \"${header}.cc\""
+	echo "#include \"${header}.h\""
 	echo "#include \"gmock/gmock.h\""
 	echo
 	ns_begin $@

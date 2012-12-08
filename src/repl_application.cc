@@ -80,8 +80,7 @@ int ReplApplication::Run() {
 		o = mach_->Lex()->Next();
 		if (!o)
 			continue;
-		//rv = mach_->Eval(o, mach_->GlobalEnvironment());
-		rv = mach_->EvalProtected(o);
+		rv = mach_->Eval(o, mach_->GlobalEnvironment());
 		if (!rv)
 			continue;
 		Print(rv);

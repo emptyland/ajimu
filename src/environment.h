@@ -64,8 +64,12 @@ public:
 		return var_.at(i);
 	}
 
-	const std::vector<values::Object*> &Variable() const {
+	const std::vector<values::Object*> &Values() const {
 		return var_;
+	}
+
+	const std::unordered_map<std::string, size_t> &Entries() const {
+		return map_;
 	}
 
 private:

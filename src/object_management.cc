@@ -1,5 +1,6 @@
 #include "object_management.h"
 #include "environment.h"
+#include "local.h"
 #include "string_pool.h"
 #include "string.h"
 #include "glog/logging.h"
@@ -110,7 +111,7 @@ Object *ObjectManagement::NewPrimitive(const std::string &name,
 	o->primitive_ = method;
 
 	// Primitive Proc must be in global environment!
-	GlobalEnvironment()->Define(name, o);
+	GlobalEnvironment()->Define(NewSymbol(name)->Symbol(), o);
 	return o;
 }
 
@@ -138,11 +139,13 @@ Object *ObjectManagement::AllocateObject(Type type) {
 	allocated_ += sizeof(Object);
 
 	Object *o = new Object(type, obj_list_, white_flag_);
+	freed_.erase(o);
 	obj_list_= o; // Linked to object list.
 	return o;
 }
 
-void ObjectManagement::GcTick(Object *rv, Object *expr) {
+void ObjectManagement::GcTick(vm::Local<Object> *local,
+		vm::Local<Environment> *env) {
 	if (!gc_started_) return;
 
 //tail:
@@ -154,8 +157,10 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 		// Mark root first.
 		gc_root_->ToBlack();
 		// Mark local expr
-		if (expr) MarkObject(expr);
-		if (rv)   MarkObject(rv);
+		for (auto val : local->Values())
+			MarkObject(val);
+		for (auto val : env->Values())
+			MarkEnvironment(val);
 		++gc_state_; 
 		DLOG(INFO) << "----------------------------------\n";
 		DLOG(INFO) << "kPause - white:" << white_flag_
@@ -166,8 +171,15 @@ void ObjectManagement::GcTick(Object *rv, Object *expr) {
 		for (auto k : constant_)
 			MarkObject(k);
 		// Mark one slot by one time!
-		for (auto var : gc_root_->Variable())
-			MarkObject(var);
+		for (auto entry : gc_root_->Entries()) {
+			DCHECK(symbol_.find(entry.first) != symbol_.end())
+				<< "Symbol table has not: "
+				<< entry.first
+				<< " for mark!";
+
+			MarkObject(symbol_[entry.first]);
+			MarkObject(gc_root_->At(entry.second));
+		}
 		++gc_state_;
 		DLOG(INFO) << "kPropagate -";
 		break;
@@ -236,8 +248,14 @@ void ObjectManagement::MarkEnvironment(Environment *env) {
 tailcall:
 	if (ShouldMark(env)) {
 		env->ToBlack();
-		for (auto elem : env->Variable())
-			MarkObject(elem);
+		for (auto entry : env->Entries()) {
+			DCHECK(symbol_.find(entry.first) != symbol_.end())
+					<< "Symbol table has not: "
+					<< entry.first
+					<< " for mark!";
+			MarkObject(symbol_[entry.first]);
+			MarkObject(env->At(entry.second));
+		}
 	}
 	env = env->Next();
 	if (env) goto tailcall;
