@@ -15,6 +15,11 @@ class Local;
 namespace values {
 class StringPool;
 
+//
+// Default gc threshold size: 10k bytes
+//
+#define DEFAULT_GC_THRESHOLD (10 * 1024)
+
 enum Constants {
 	kFalse,
 	kTrue,
@@ -57,7 +62,11 @@ public:
 	//
 	// For GC:
 	//
-	size_t AllocatedSize() const;
+	size_t Allocated() const;
+
+	size_t Threshold() const {
+		return gc_threshold_;
+	}
 
 	int GcState() const {
 		return gc_state_;
@@ -165,10 +174,10 @@ private:
 	std::unique_ptr<StringPool> pool_;
 
 	// For GC:
-	vm::Environment *gc_root_;
-	int gc_state_;
-	bool gc_started_;
+	vm::Environment *gc_root_; // The reachable root
+	int gc_state_;             // Current gc state
 	unsigned white_flag_;
+	size_t gc_threshold_;
 	size_t allocated_;
 
 	// Object in gc

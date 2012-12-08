@@ -15,8 +15,8 @@ ObjectManagement::ObjectManagement()
 	: pool_(new StringPool)
 	, gc_root_(nullptr)
 	, gc_state_(kPause)
-	, gc_started_(false)
 	, white_flag_(Reachable::WHITE_BIT0)
+	, gc_threshold_(DEFAULT_GC_THRESHOLD)
 	, allocated_(0)
 	, obj_list_(nullptr)
 	, env_list_(nullptr) {
@@ -59,12 +59,9 @@ void ObjectManagement::Init() {
 
 	// Environment initializing:
 	gc_root_ = NewEnvironment(nullptr);
-
-	// GC startup:
-	gc_started_ = true;
 }
 
-size_t ObjectManagement::AllocatedSize() const {
+size_t ObjectManagement::Allocated() const {
 	return allocated_ + pool_->Allocated();
 }
 
@@ -146,12 +143,11 @@ Object *ObjectManagement::AllocateObject(Type type) {
 
 void ObjectManagement::GcTick(vm::Local<Object> *local,
 		vm::Local<Environment> *env) {
-	if (!gc_started_) return;
-
 //tail:
 	switch (gc_state_) {
 	case kPause: // GC Pause
-		// TODO:
+		if (Allocated() < Threshold())
+			return;
 		// Switch the white flag!
 		white_flag_ = InvWhite(white_flag_);
 		// Mark root first.
@@ -162,9 +158,6 @@ void ObjectManagement::GcTick(vm::Local<Object> *local,
 		for (auto val : env->Values())
 			MarkEnvironment(val);
 		++gc_state_; 
-		DLOG(INFO) << "----------------------------------\n";
-		DLOG(INFO) << "kPause - white:" << white_flag_
-			<< " allocated:" << allocated_;
 		break;
 	case kPropagate: // Mark root environment
 		// Mark constants
@@ -181,26 +174,21 @@ void ObjectManagement::GcTick(vm::Local<Object> *local,
 			MarkObject(gc_root_->At(entry.second));
 		}
 		++gc_state_;
-		DLOG(INFO) << "kPropagate -";
 		break;
 	case kSweepEnv: // Sweep environments
 		SweepEnvironment();
 		++gc_state_;
-		DLOG(INFO) << "kSweepEnv - allocated:" << allocated_;
 		break;
 	case kSweepString:
 		pool_->Sweep(white_flag_);
 		++gc_state_;
-		DLOG(INFO) << "kSweepString - allocated:" << allocated_;
 		break;
 	case kSweep: // Sweep objects
 		SweepObject();
 		++gc_state_;
-		DLOG(INFO) << "kSweep - allocated:" << allocated_;
 		break;
 	case kFinalize:
 		gc_state_ = kPause;
-		DLOG(INFO) << "kFinalize - allocated:" << allocated_;
 		break;
 	default:
 		DLOG(FATAL) << "No reached!";
@@ -280,7 +268,6 @@ void ObjectManagement::SweepEnvironment() {
 		}
 	}
 	env_list_ = dummy.next_;
-	DLOG(INFO) << "SweepEnvironment() xed:" << sweeped;
 }
 
 void ObjectManagement::SweepObject() {
@@ -302,7 +289,6 @@ void ObjectManagement::SweepObject() {
 		}
 	}
 	obj_list_ = dummy.next_;
-	DLOG(INFO) << "SweepObject() sweeped:" << sweeped;
 }
 
 void ObjectManagement::CollectObject(Object *o) {

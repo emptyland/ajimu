@@ -161,7 +161,10 @@ inline Object *SequenceToExpr(Object *seq, ObjectManagement *obm_) {
 // Class : Mach
 //-----------------------------------------------------------------------------
 Mach::Mach() 
-	: global_env_(nullptr)
+	: obm_(new ObjectManagement())
+	, local_val_(new Local<Object>())
+	, local_env_(new Local<Environment>())
+	, global_env_(nullptr)
 	, error_(0)
 	, call_level_(0) {
 }
@@ -193,7 +196,7 @@ Object *Mach::Feed(const char *input) {
 }
 
 bool Mach::Init() {
-	struct PrimitiveEntry {
+	static const struct PrimitiveEntry {
 		const char *name;
 		values::PrimitiveMethodPtr method;
 	} kProcs[] = {
@@ -245,10 +248,6 @@ bool Mach::Init() {
 		{ "ajimu.gc.state", &Mach::AjimuGcState, },
 	};
 
-	local_val_.reset(new Local<Object>());
-	local_env_.reset(new Local<Environment>());
-
-	obm_.reset(new ObjectManagement());
 	obm_->Init();
 	// Register primitive proc(s)
 	for (const PrimitiveEntry &i : kProcs) {
@@ -822,7 +821,7 @@ Object *Mach::Error(Object *args) {
 // Extension Primitive Procedures:
 //
 Object *Mach::AjimuGcAllocated(Object * /*args*/) {
-	long long rv = obm_->AllocatedSize();
+	long long rv = obm_->Allocated();
 	return obm_->NewFixed(rv);
 }
 
