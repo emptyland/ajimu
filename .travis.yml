@@ -1,0 +1,9 @@
+language: c+
+
+compiler:
+    - clang
+    - gcc
+
+script:
+    - scons -Q
+    - src/all_test
