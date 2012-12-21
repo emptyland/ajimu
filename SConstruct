@@ -23,10 +23,11 @@ if conf['CC'] == 'clang' or conf['CXX'] == 'clang++':
 	conf['CCFLAGS'] = conf['CCFLAGS'] + ' -fcolor-diagnostics'
 
 env = Environment(CC = conf['CC'],
-                  CXX = conf['CXX'],
-				  CCFLAGS = conf['CCFLAGS'],
-                  LIBPATH = '#src third_party/gflags third_party/gmock third_party/glog'.split(),
-				  platform  = 'posix')
+	CXX = conf['CXX'],
+	CCFLAGS = conf['CCFLAGS'],
+	LIBPATH = '#src third_party/gflags third_party/gmock third_party/glog'.split(),
+	platform  = 'posix')
+
 Export('env')
 SConscript('src/SConscript')
 SConscript('src/third_party/gmock/SConscript')
