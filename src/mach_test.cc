@@ -243,7 +243,8 @@ TEST_F(MachTest, Types) {
 		"	(cond "
 		"		((null?      obj) \"null\")"
 		"		((symbol?    obj) \"symbol\")"
-		"		((number?    obj) \"number\")"
+		"		((integer?   obj) \"integer\")"
+		"		((float?     obj) \"float\")"
 		"		((pair?      obj) \"pair\")"
 		"		((procedure? obj) \"procedure\")"
 		"		(else \"other\")"
@@ -251,7 +252,7 @@ TEST_F(MachTest, Types) {
 		")"
 		"(typeof 1)"
 	);
-	ASSERT_STREQ("number", ok->String()->c_str());
+	ASSERT_STREQ("integer", ok->String()->c_str());
 
 	ok = mach_->Feed("(typeof typeof)");
 	ASSERT_STREQ("procedure", ok->String()->c_str());
