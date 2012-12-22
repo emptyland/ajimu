@@ -4,7 +4,7 @@ Import('env')
 
 test_main = env.StaticObject('test_main.cc');
 
-test_libs = 'ajimu glog gflags gmock ngx_slab profiler pthread'.split()
+test_libs = 'ajimu glog gflags gmock ngx_slab pthread'.split()
 
 def DefTest(name, obj):
 	env.Program(name + '_test', [obj, test_main], LIBS=test_libs)

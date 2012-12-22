@@ -3,10 +3,6 @@ language: c++
 compiler:
     - clang
 
-before_script:
-    - echo "Need libprofile"
-    - sudo apt-get install libgperftools-dev
-
 script:
     - scons -Q
     - src/all_test
