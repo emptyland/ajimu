@@ -15,7 +15,7 @@
 
 #if defined(__LP64__) || defined(__ILP64__) || defined(__LLP64__)
 #	define NGX_PTR_SIZE 8
-#elif defined(__ILP32__)
+#else
 #	define NGX_PTR_SIZE 4
 #endif
 
