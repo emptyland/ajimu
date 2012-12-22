@@ -25,7 +25,11 @@ if conf['CC'] == 'clang' or conf['CXX'] == 'clang++':
 env = Environment(CC = conf['CC'],
 	CXX = conf['CXX'],
 	CCFLAGS = conf['CCFLAGS'],
-	LIBPATH = '#src third_party/gflags third_party/gmock third_party/glog'.split(),
+	LIBPATH = '''#src
+		third_party/gflags
+		third_party/gmock
+		third_party/glog
+		third_party/nginx'''.split(),
 	platform  = 'posix')
 
 Export('env')
@@ -33,3 +37,4 @@ SConscript('src/SConscript')
 SConscript('src/third_party/gmock/SConscript')
 SConscript('src/third_party/gflags/SConscript')
 SConscript('src/third_party/glog/SConscript')
+SConscript('src/third_party/nginx/SConscript')

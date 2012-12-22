@@ -6,6 +6,8 @@ namespace ajimu {
 namespace values {
 
 TEST(ObjectTest, Sanity) {
+	printf("sizeof(Object): %zd\n", sizeof(Object));
+	printf("sizeof(Object*): %zd\n", sizeof(Object*));
 }
 
 } // namespace values

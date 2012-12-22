@@ -1,0 +1,4 @@
+from SCons.Script import *
+
+Import('env')
+env.Library('ngx_slab', Glob("*.c"))

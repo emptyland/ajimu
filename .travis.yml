@@ -3,6 +3,9 @@ language: c++
 compiler:
     - clang
 
+before_script:
+    - sudo apt-get install gperftools
+
 script:
     - scons -Q
     - src/all_test

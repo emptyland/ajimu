@@ -4,9 +4,10 @@ Import('env')
 
 test_main = env.StaticObject('test_main.cc');
 
+test_libs = 'ajimu glog gflags gmock ngx_slab profiler pthread'.split()
+
 def DefTest(name, obj):
-	env.Program(name + '_test', [obj, test_main],
-		LIBS='ajimu glog gflags gmock pthread'.split())
+	env.Program(name + '_test', [obj, test_main], LIBS=test_libs)
 
 def DefAllTest(name):
 	units = []
@@ -15,8 +16,7 @@ def DefAllTest(name):
 		DefTest(i, o)
 		units.append(o)
 	units.append(test_main)
-	env.Program('all_test', units,
-		LIBS='ajimu glog gflags gmock pthread'.split())
+	env.Program('all_test', units, LIBS=test_libs)
 
 env.Library('ajimu',
 	'''
@@ -37,7 +37,8 @@ DefAllTest('''object
 	mach
 	repl_application
 	string_pool
-	local'''.split())
+	local
+	slab'''.split())
 
 env.Program('ajimu', 'main.cc',
 	LIBS='ajimu glog gflags pthread'.split(),

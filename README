@@ -1,9 +1,0 @@
-ajimu - a simple scheme implement. The name from Ajimu Najimi.
-
-Build:
-	Require C++11 supports.
-	Make: (clang++ compiler is default)
-		$ cd ajimu
-		$ scons
-	Clean:
-		$ scons -c
