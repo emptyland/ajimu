@@ -9,16 +9,22 @@ namespace vm {
 using values::ObjectManagement;
 using values::Object;
 
-#define Nil (obm_->Constant(values::kEmptyList))
+#define Null (obm_->Constant(values::kEmptyList))
 #define Kof(i) (obm_->Constant(values::k##i))
 Object *MacroAnalyzer::Extend(Object *s, Object *o) {
 	Drop();
 	name_ = cadr(s);
 
 	Object *rules = caddr(s);
-	//Object *ids = cadr(rules);
+	Object *ids = cadr(rules);
+	while (ids != Null) {
+		if (!car(ids)->IsSymbol()) // Error
+			return nullptr;
+		identifier_.insert(car(ids)->Symbol());
+		ids = cdr(ids);
+	}
 	Object *entry = cddr(rules);
-	while (entry != Nil) {
+	while (entry != Null) {
 		Object *pair = car(entry);
 		Object *pattern = car(pair);
 		Object *tmpl = cadr(pair);
@@ -98,10 +104,17 @@ bool MacroAnalyzer::Match(Object *pattern, Object *o) {
 				ok = true;
 			}
 		} else if (pl[i]->IsSymbol()) {
-			printf("bind %s <- [%s]\n",
-					pl[i]->Symbol(), ol[j]->ToString(obm_).c_str());
-			binded_[pl[i]->Symbol()] = ol[j];
-			ok = true;
+			if (Identifier(pl[i]->Symbol())) {
+				if (ol[j]->IsSymbol()) {
+					printf("identifier: %s\n", ol[j]->Symbol());
+					ok = strcmp(pl[i]->Symbol(), ol[j]->Symbol()) == 0;
+				}
+			} else {
+				printf("bind %s <- [%s]\n",
+						pl[i]->Symbol(), ol[j]->ToString(obm_).c_str());
+				binded_[pl[i]->Symbol()] = ol[j];
+				ok = true;
+			}
 		} else if (pl[i]->IsPair()) {
 			if (ol[j]->IsPair())
 				ok = Match(pl[i], ol[j]);
@@ -149,7 +162,7 @@ std::vector<Object*> *MacroAnalyzer::MutableEllipsis(const std::string &name) {
 
 std::vector<Object*> MacroAnalyzer::List2Vector(Object *list) {
 	std::vector<Object*> rv;
-	while (list != Nil) {
+	while (list != Null) {
 		rv.push_back(car(list));
 		list = cdr(list);
 	}
@@ -157,7 +170,7 @@ std::vector<Object*> MacroAnalyzer::List2Vector(Object *list) {
 }
 
 Object *MacroAnalyzer::Vector2List(const std::vector<Object*> &flat) {
-	Object *o, *p = Nil;
+	Object *o, *p = Null;
 	auto i = flat.size();
 	while (i--) {
 		o = obm_->Cons(flat[i], p);
@@ -166,6 +179,16 @@ Object *MacroAnalyzer::Vector2List(const std::vector<Object*> &flat) {
 	return o;
 }
 
+void MacroAnalyzer::Drop() {
+	for (auto pair : ellipsis_)
+		delete pair.second;
+	ellipsis_.clear();
+	binded_.clear();
+	identifier_.clear();
+}
+
+#undef Null
+#undef Kof
 } // namespace vm
 } // namespace ajimu
 

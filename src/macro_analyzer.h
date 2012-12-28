@@ -1,8 +1,9 @@
 #ifndef AJIMU_VM_MACRO_ANALYZER_H
 #define AJIMU_VM_MACRO_ANALYZER_H
 
-#include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include <string>
 
 namespace ajimu {
@@ -47,18 +48,19 @@ private:
 		return iter == binded_.end() ? nullptr : iter->second;
 	}
 
+	bool Identifier(const std::string &name) const {
+		return identifier_.find(name) != identifier_.end();
+	}
+
 	std::vector<values::Object*> List2Vector(values::Object *list);
 
 	values::Object *Vector2List(const std::vector<values::Object*> &flat);
 
-	void Drop() {
-		for (auto pair : ellipsis_) delete pair.second;
-		ellipsis_.clear();
-		binded_.clear();
-	}
+	void Drop();
 
 	values::ObjectManagement *obm_;
 	const values::Object *name_;
+	std::unordered_set<std::string> identifier_;
 	std::unordered_map<std::string, values::Object*> binded_;
 	std::unordered_map<std::string, std::vector<values::Object*>*> ellipsis_;
 	const std::vector<values::Object*> kEmptyVector;

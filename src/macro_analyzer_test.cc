@@ -173,6 +173,27 @@ TEST_F(MacroAnalyzerTest, UnlessSyntax) {
 			"(unless (= a b) (display 'no-equals))", s);
 }
 
+TEST_F(MacroAnalyzerTest, CondSyntax) {
+	Object *s = AssertMakeSyntax(
+	"(define-syntax cond"
+	"	(syntax-rules (else)"
+	"		((_ (else expr ...))"
+	"			(begin expr ...))"
+	"		((_ (test expr ...))"
+	"			(if test (begin expr ...)))"
+	"		((_ (test expr ...) rest ...)"
+	"			(if test (begin expr ...) (cond rest ...)))))"
+	);
+	AssertExtend(nullptr,
+			"(cond (else (display 'else)))", s);
+
+	AssertExtend(nullptr,
+			"(cond"
+			"	((= a 1) (display 1))"
+			"	((= a 2) (display 2))"
+			"	((else (display 'other))))", s);
+}
+
 } // namespace vm
 } // namespace ajimu
 
