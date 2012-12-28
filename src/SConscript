@@ -27,6 +27,7 @@ env.Library('ajimu',
 	repl_application.cc
 	eval_application.cc
 	string_pool.cc
+	macro_analyzer.cc
 	'''.split(),
 	CPPFLAGS='-std=c++11');
 
@@ -38,7 +39,8 @@ DefAllTest('''object
 	repl_application
 	string_pool
 	local
-	slab'''.split())
+	slab
+	macro_analyzer'''.split())
 
 env.Program('ajimu', 'main.cc',
 	LIBS='ajimu glog gflags pthread'.split(),

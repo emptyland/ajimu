@@ -3,6 +3,8 @@
 #include "string.h"
 #include "gmock/gmock.h"
 #include <stdio.h>
+#include <vector>
+#include <map>
 
 namespace ajimu {
 namespace vm {
@@ -220,6 +222,22 @@ TEST_F(LexerTest, StringX) {
 	ASSERT_NE(nullptr, ob);
 	String *ref = ob->String();
 	ASSERT_EQ(e, ref->str());
+}
+
+TEST_F(LexerTest, SyntaxDefinitionSymbol) {
+	std::string input("_");
+	lexer_->Feed(input.c_str(), input.size());
+	Object *ob = lexer_->Next();
+	ASSERT_NE(nullptr, ob);
+	ASSERT_STREQ("_", ob->Symbol());
+	ASSERT_EQ(obm_->Constant(values::kUnderLineSymbol), ob);
+
+	input = "...";
+	lexer_->Feed(input.c_str(), input.size());
+	ob = lexer_->Next();
+	ASSERT_NE(nullptr, ob);
+	ASSERT_STREQ("...", ob->Symbol());
+	ASSERT_EQ(obm_->Constant(values::kEllipsisSymbol), ob);
 }
 
 } // namespace vm

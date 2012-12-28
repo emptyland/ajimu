@@ -98,21 +98,24 @@ static inline intptr_t fast_1st_zero(uintptr_t slab) {
 	return rv;
 }*/
 
+/*
 TEST(FastBit, BitOp) {
 	for (int n = 0; n < kBitCount; ++n) {
-		uintptr_t slab = 0, m;
-		intptr_t i = 0;
+		uintptr_t slab = 0;//, m;
 		while (slab != kFullMask) {
-			m = slab ^ (slab + 1);
 			__asm__ __volatile__(
-				"bsr %1, %0":
-				"=r"(i) : "r"(m));
-			m = 1 << i;
-			slab |= m;
+				"movq %1, %%rbx\n"
+				"movq %1, %%rdx\n"
+				"incq %%rbx\n"
+				"xorq %%rdx, %%rbx\n"
+				"bsr %%rbx, %%rbx\n"
+				"bts %%rbx, %0\n"
+				:
+				"=r"(slab) : "r"(slab) : "rbx", "rdx", "cc");
 		}
 		ASSERT_EQ(slab, kFullMask);
 	}
-}
+}*/
 
 static const int kLog2[256] = {
 	0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,

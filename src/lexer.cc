@@ -55,7 +55,9 @@ Object *Lexer::Next() {
 				return ReadSymbol();
 			return ReadNumber();
 		case '.':
-			return ReadFloat(0LL, +1);
+			if (isdigit(cur_[1]))
+				return ReadFloat(0LL, +1);
+			return ReadSymbol();
 		case '\'':
 			++cur_;
 			return obm_->Cons(Kof(QuoteSymbol),
@@ -114,7 +116,11 @@ Object *Lexer::ReadPair() {
 		return nullptr;
 	if (!EatWhiteSpace())
 		return nullptr;
-	if (*cur_ != '.') {
+	if (cur_[0] != '.') {
+		Object *cdr = ReadPair();
+		return obm_->Cons(car, cdr);
+	}
+	if (cur_[1] == '.' && cur_[2] == '.') {
 		Object *cdr = ReadPair();
 		return obm_->Cons(car, cdr);
 	}

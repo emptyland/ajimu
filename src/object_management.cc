@@ -56,6 +56,10 @@ void ObjectManagement::Init() {
 	constant_[kLetSymbol] = NewSymbol("let");
 	constant_[kAndSymbol] = NewSymbol("and");
 	constant_[kOrSymbol] = NewSymbol("or");
+	constant_[kUnderLineSymbol] = NewSymbol("_");
+	constant_[kEllipsisSymbol] = NewSymbol("...");
+	constant_[kDefineSyntax] = NewSymbol("define-syntax");
+	constant_[kSyntaxRules] = NewSymbol("syntax-rules");
 
 	// Environment initializing:
 	gc_root_ = NewEnvironment(nullptr);

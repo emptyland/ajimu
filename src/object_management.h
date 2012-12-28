@@ -36,6 +36,10 @@ enum Constants {
 	kLetSymbol,
 	kAndSymbol,
 	kOrSymbol,
+	kUnderLineSymbol, // _
+	kEllipsisSymbol, // ...
+	kDefineSyntax, // define-syntax
+	kSyntaxRules, // syntax-rules
 
 	kMax, // Make sure it to be last one
 };
