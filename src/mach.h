@@ -14,6 +14,7 @@ class Object;
 } // namespace values
 namespace vm {
 class Lexer;
+class MacroAnalyzer;
 class Environment;
 template<class T> class Local;
 
@@ -71,6 +72,9 @@ private:
 	values::Object *LookupVariable(values::Object *expr,
 			Environment *env);
 
+	values::Object *EvalSyntaxDefinition(values::Object *expr,
+			Environment *env);
+
 	values::Object *EvalDefinition(values::Object *expr,
 			Environment *env);
 
@@ -79,8 +83,6 @@ private:
 
 	values::Object *ListOfValues(values::Object *operand,
 			Environment *env);
-
-	values::Object *ExpandClauses(values::Object *clauses);
 
 	Environment *ExtendEnvironment(values::Object *params,
 			values::Object *args, Environment *base);
@@ -137,6 +139,7 @@ private:
 	std::unique_ptr<Local<values::Object>> local_val_;
 	std::unique_ptr<Local<Environment>>    local_env_;
 	std::unique_ptr<Lexer> lex_;
+	std::unique_ptr<MacroAnalyzer> factory_;
 	std::stack<std::string> file_level_;
 	std::vector<Observer> observer_;
 	Environment *global_env_;

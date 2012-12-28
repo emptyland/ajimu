@@ -1,6 +1,7 @@
 #include "mach.h"
 #include "object_management.h"
 #include "object.h"
+#include "macro_analyzer.h"
 #include "environment.h"
 #include "local.h"
 #include "lexer.h"
@@ -110,10 +111,6 @@ inline bool IsAnd(Object *expr, ObjectManagement *obm_) {
 
 inline bool IsOr(Object *expr, ObjectManagement *obm_) {
 	return IsTaggedList(expr, Kof(OrSymbol));
-}
-
-inline bool IsCond(Object *expr, ObjectManagement *obm_) {
-	return IsTaggedList(expr, Kof(CondSymbol));
 }
 
 inline Object *MakeLambda(Object *params, Object *body,
@@ -255,6 +252,9 @@ bool Mach::Init() {
 	for (const PrimitiveEntry &i : kProcs) {
 		obm_->NewPrimitive(i.name, i.method);
 	}
+
+	// Initialize macro analyzer
+	factory_.reset(new MacroAnalyzer(obm_.get()));
 	
 	// Initialize Lexer
 	lex_.reset(new Lexer(obm_.get()));
@@ -342,13 +342,6 @@ tailcall:
 		goto tailcall;
 	}
 
-	// Cond statement
-	if (IsCond(expr, obm_.get())) {
-		expr = ExpandClauses(cdr(expr)); // cdr: cond clauses
-		Pop(1);
-		goto tailcall;
-	}
-
 	// Let statement
 	if (IsLet(expr, obm_.get())) {
 		Object *operators = MakeLambda(
@@ -410,6 +403,25 @@ tailcall:
 		goto tailcall;
 	}
 
+	// Syntax transfer
+	if (expr->IsPair()) {
+		if (car(expr) == Kof(DefineSyntax))
+			return EvalSyntaxDefinition(expr, env);
+		Object *name = car(expr);
+		if (name->IsSymbol()) {
+			Object *syntax = LookupVariable(name, env);
+			if (syntax && syntax->IsPair() &&
+					car(syntax) == Kof(DefineSyntax)) {
+				Object *o = factory_->Extend(syntax, expr);
+				if (o) {
+					expr = o;
+					Pop(1);
+					goto tailcall;
+				}
+			}
+		}
+	}
+
 	// Exec block
 	if (expr->IsPair()) { // Is application 
 		Push(Eval(car(expr), env)); // proc | car: operator
@@ -459,6 +471,16 @@ Object *Mach::LookupVariable(Object *expr, Environment *env) {
 	if (!handle.Valid())
 		RaiseErrorf("Unbound variable, \"%s\".", expr->Symbol());
 	return handle.Get();
+}
+
+Object *Mach::EvalSyntaxDefinition(Object *expr, Environment *env) {
+	Object *name = cadr(expr);
+	if (!name->IsSymbol()) {
+		RaiseError("Bad syntax definition, need name.");
+		return nullptr;
+	}
+	env->Define(name->Symbol(), expr);
+	return Kof(OkSymbol);
 }
 
 Object *Mach::EvalDefinition(Object *expr, Environment *env) {
@@ -512,30 +534,6 @@ Object *Mach::ListOfValues(Object *operand, Environment *env) {
 	Push(ListOfValues(cdr(Last(1)), env));
 	return obm_->Cons(Last(1), Last(0));
 }
-
-Object *Mach::ExpandClauses(Object *clauses) {
-	if (clauses == Kof(EmptyList))
-		return Kof(False);
-
-	Object *first = car(clauses);
-	Object *rest  = cdr(clauses);
-	if (car(first) == Kof(ElseSymbol)) { // is cond else clause?
-		if (rest != Kof(EmptyList)) {
-			RaiseError("Else clause is not last cond->if.");
-			return nullptr;
-		}
-		// rest == EmptyList
-		// cdr: cond actions
-		return SequenceToExpr(cdr(first), obm_.get());
-	}
-	// car: cond predicate
-	return MakeIf(car(first),
-			// cdr: cond action
-			SequenceToExpr(cdr(first), obm_.get()),
-			ExpandClauses(rest),
-			obm_.get());
-}
-
 
 Environment *Mach::ExtendEnvironment(Object *params, Object *args,
 		Environment *top) {
