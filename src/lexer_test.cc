@@ -102,12 +102,12 @@ TEST_F(LexerTest, Fixed) {
 	}
 }
 
-TEST_F(LexerTest, Float) {
+TEST_F(LexerTest, Real) {
 	std::string input("0.1");
 	lexer_->Feed(input.c_str(), input.size());
 	Object *ob = lexer_->Next();
-	ASSERT_EQ(values::FLOAT, ob->OwnedType());
-	ASSERT_DOUBLE_EQ(0.1, ob->Float());
+	ASSERT_EQ(values::REAL, ob->OwnedType());
+	ASSERT_DOUBLE_EQ(0.1, ob->Real());
 
 	input = ".1 0.0002 1000.0001 +0.1 -0.1 -100000.00001";
 	static const double expected[] = {
@@ -118,7 +118,7 @@ TEST_F(LexerTest, Float) {
 		ob = lexer_->Next();
 		ASSERT_NE(nullptr, ob) << "Fail in: " << val
 			<< " Current: " << lexer_->TEST_Current();
-		ASSERT_DOUBLE_EQ(val, ob->Float());
+		ASSERT_DOUBLE_EQ(val, ob->Real());
 	}
 }
 
@@ -238,6 +238,18 @@ TEST_F(LexerTest, SyntaxDefinitionSymbol) {
 	ASSERT_NE(nullptr, ob);
 	ASSERT_STREQ("...", ob->Symbol());
 	ASSERT_EQ(obm_->Constant(values::kEllipsisSymbol), ob);
+}
+
+TEST_F(LexerTest, Comment) {
+	std::string input(
+	"; (display 'comment)\n"
+	"Comment ; (display 'newline)\n"
+	"; (final)"
+	);
+	lexer_->Feed(input.c_str(), input.size());
+	Object *o = lexer_->Next();
+	ASSERT_NE(nullptr, o);
+	ASSERT_STREQ("Comment", o->Symbol());
 }
 
 } // namespace vm

@@ -30,7 +30,6 @@ Object *MacroAnalyzer::Extend(Object *s, Object *o) {
 		Object *tmpl = cadr(pair);
 		bool ok = Match(pattern, o);
 		if (ok) {
-			// printf("Matched: %s\n", pattern->ToString(obm_).c_str());
 			return DoExtend(tmpl);
 		}
 		Drop();
@@ -81,6 +80,8 @@ Object *MacroAnalyzer::DoExtend(Object *t) {
 bool MacroAnalyzer::Match(Object *pattern, Object *o) {
 	std::vector<Object*> pl(std::move(List2Vector(pattern))),
 		ol(std::move(List2Vector(o)));
+	if (ol.size() == 0 && pl.size() > 0)
+		return false;
 	size_t j = 0;
 	for (size_t i = 0; i < pl.size(); ++i) {
 		bool ok = false;
@@ -106,12 +107,9 @@ bool MacroAnalyzer::Match(Object *pattern, Object *o) {
 		} else if (pl[i]->IsSymbol()) {
 			if (Identifier(pl[i]->Symbol())) {
 				if (ol[j]->IsSymbol()) {
-					// printf("identifier: %s\n", ol[j]->Symbol());
 					ok = strcmp(pl[i]->Symbol(), ol[j]->Symbol()) == 0;
 				}
 			} else {
-				// printf("bind %s <- [%s]\n",
-				//		pl[i]->Symbol(), ol[j]->ToString(obm_).c_str());
 				binded_[pl[i]->Symbol()] = ol[j];
 				ok = true;
 			}
@@ -132,8 +130,6 @@ bool MacroAnalyzer::Match(Object *pattern, Object *o) {
 bool MacroAnalyzer::BindEllipsis(Object *p, Object *o) {
 	if (p->IsSymbol()) {
 		MutableEllipsis(p->Symbol())->push_back(o);
-		// printf("bind ...(%s) <- [%s]\n", p->ToString(obm_).c_str(),
-		//		o->ToString(obm_).c_str());
 		return true;
 	}
 	if (!p->IsPair() || !o->IsPair())
@@ -146,8 +142,6 @@ bool MacroAnalyzer::BindEllipsis(Object *p, Object *o) {
 		if (!BindEllipsis(pl[i], ol[i]))
 			return false;
 	}
-	// printf("bind ...(%s) <- [%s]\n", p->ToString(obm_).c_str(),
-	//		o->ToString(obm_).c_str());
 	return true;
 }
 

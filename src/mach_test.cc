@@ -131,27 +131,6 @@ TEST_F(MachTest, If) {
 	ASSERT_EQ(100, ok->Fixed());
 }
 
-TEST_F(MachTest, Let) {
-	Object *ok = mach_->Feed(
-		"(let ((a 1) (b 2))"
-		"	(+ a b))"
-	);
-	ASSERT_EQ(3, ok->Fixed());
-	ok = mach_->Feed(
-		"(let ((x 1) (y 2))"
-		"	(let ((x 2) (y 3))"
-		"		(* x y)))"
-	);
-	ASSERT_EQ(6, ok->Fixed());
-	ok = mach_->Feed(
-		"(define x 100)"
-		"(let ((a 1) (b 2))"
-		"	(let ((c 3) (d 4))"
-		"		(+ (+ (+ a b) (+ c d)) x)))"
-	);
-	ASSERT_EQ(110, ok->Fixed());
-}
-
 TEST_F(MachTest, Lambda) {
 	Object *ok = mach_->Feed(
 		"((lambda (a b c) (+ a (* b c))) 1 2 3)"
@@ -244,6 +223,32 @@ TEST_F(MachTest, DefineSyntaxCond) {
 
 	ok = mach_->Feed("(foo 1)");
 	ASSERT_EQ(10, ok->Fixed());
+}
+
+TEST_F(MachTest, DefineSyntaxLet) {
+	Object *ok = mach_->Feed(
+		"(define-syntax let"
+		"	(syntax-rules ()"
+		"		((_ ((x v) ...) body ...)"
+		"			((lambda (x ...) body ...) v ...))))"
+		"\n"
+		"(let ((a 1) (b 2))"
+		"	(+ a b))"
+	);
+	ASSERT_EQ(3, ok->Fixed());
+	ok = mach_->Feed(
+		"(let ((x 1) (y 2))"
+		"	(let ((x 2) (y 3))"
+		"		(* x y)))"
+	);
+	ASSERT_EQ(6, ok->Fixed());
+	ok = mach_->Feed(
+		"(define x 100)"
+		"(let ((a 1) (b 2))"
+		"	(let ((c 3) (d 4))"
+		"		(+ (+ (+ a b) (+ c d)) x)))"
+	);
+	ASSERT_EQ(110, ok->Fixed());
 }
 
 TEST_F(MachTest, GC) {

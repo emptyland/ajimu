@@ -208,7 +208,7 @@ tailcall:
 		break;
 	case SYMBOL:
 	case FIXED:
-	case FLOAT:
+	case REAL:
 	case CHARACTER:
 		Mark(o);
 		break;

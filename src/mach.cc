@@ -63,7 +63,7 @@ inline bool IsSelfEvaluating(Object *expr) {
 	switch (expr->OwnedType()) {
 	case values::BOOLEAN:
 	case values::FIXED:
-	case values::FLOAT:
+	case values::REAL:
 	case values::CHARACTER:
 	case values::STRING:
 		return true;
@@ -101,10 +101,6 @@ inline bool IsIf(Object *expr, ObjectManagement *obm_) {
 	return IsTaggedList(expr, Kof(IfSymbol));
 }
 
-inline bool IsLet(Object *expr, ObjectManagement *obm_) {
-	return IsTaggedList(expr, Kof(LetSymbol));
-}
-
 inline bool IsAnd(Object *expr, ObjectManagement *obm_) {
 	return IsTaggedList(expr, Kof(AndSymbol));
 }
@@ -118,41 +114,11 @@ inline Object *MakeLambda(Object *params, Object *body,
 	return obm_->Cons(Kof(LambdaSymbol), obm_->Cons(params, body));
 }
 
-inline Object *MakeIf(Object *pred, Object *cons, Object *alter,
-		ObjectManagement *obm_) {
-	return obm_->Cons(Kof(IfSymbol),
-				obm_->Cons(pred,
-					obm_->Cons(cons,
-						obm_->Cons(alter, Kof(EmptyList)))));
-}
-
 inline Object *PrepareApplyOperands(Object *args, ObjectManagement *obm_) {
 	if (cdr(args) == Kof(EmptyList))
 		return car(args);
 	return obm_->Cons(car(args),
 			PrepareApplyOperands(cdr(args), obm_));
-}
-
-inline Object *BindingsParams(Object *bindings, ObjectManagement *obm_) {
-	return bindings == Kof(EmptyList) ?
-		Kof(EmptyList) :
-		obm_->Cons(caar(bindings), // caar: binding parameter
-				BindingsParams(cdr(bindings), obm_));
-}
-
-inline Object *BindingsArgs(Object *bindings, ObjectManagement *obm_) {
-	return bindings == Kof(EmptyList) ?
-		Kof(EmptyList) :
-		obm_->Cons(cadar(bindings), // cadar: binding argument
-				BindingsArgs(cdr(bindings), obm_));
-}
-
-inline Object *SequenceToExpr(Object *seq, ObjectManagement *obm_) {
-	if (seq == Kof(EmptyList))
-		return Kof(EmptyList);
-	if (cdr(seq) == Kof(EmptyList)) // cdr: last expr
-		return car(seq); // car: first expr
-	return obm_->Cons(Kof(BeginSymbol), seq); // make begin
 }
 
 //-----------------------------------------------------------------------------
@@ -207,7 +173,7 @@ bool Mach::Init() {
 		{ "null?",    &Mach::IsNull,    },
 		{ "pair?",    &Mach::IsPair,    },
 		{ "integer?", &Mach::IsInteger, },
-		{ "float?",   &Mach::IsFloat,   },
+		{ "real?",   &Mach::IsReal,   },
 		{ "string?",  &Mach::IsString,  },
 		{ "bytevector?", &Mach::IsByteVector, },
 		{ "procedure?",  &Mach::IsProcedure,  },
@@ -319,6 +285,8 @@ tailcall:
 	obm_->GcTick(local_val_.get(), local_env_.get());
 
 	// Sample statement
+	if (obm_->Null(expr))
+		goto fail;
 	if (IsSelfEvaluating(expr))
 		return expr;
 	if (IsVariable(expr))
@@ -338,19 +306,6 @@ tailcall:
 			caddr(expr) : // caddr: consequent
 			// if Alternative
 			cdddr(expr) == Kof(EmptyList) ? Kof(False) : cadddr(expr);
-		Pop(1);
-		goto tailcall;
-	}
-
-	// Let statement
-	if (IsLet(expr, obm_.get())) {
-		Object *operators = MakeLambda(
-				BindingsParams(cadr(expr), obm_.get()),
-				cddr(expr), // cddr: let body
-				obm_.get());
-		// cadr: let bings
-		Object *operands = BindingsArgs(cadr(expr), obm_.get());
-		expr = obm_->Cons(operators, operands);
 		Pop(1);
 		goto tailcall;
 	}
@@ -410,7 +365,9 @@ tailcall:
 		Object *name = car(expr);
 		if (name->IsSymbol()) {
 			Object *syntax = LookupVariable(name, env);
-			if (syntax && syntax->IsPair() &&
+			if (!syntax)
+				return nullptr;
+			if (syntax->IsPair() &&
 					car(syntax) == Kof(DefineSyntax)) {
 				Object *o = factory_->Extend(syntax, expr);
 				if (o) {
@@ -462,6 +419,7 @@ tailcall:
 		RaiseError("Unknown Last(0)edure type.");
 		return nullptr;
 	}
+fail:
 	RaiseError("Bad eval! no one can be evaluated.");
 	return nullptr;
 }
@@ -578,7 +536,7 @@ void Mach::RaiseErrorf(const char *fmt, ...) {
 //
 #define EXPECT_NUMBER(proc, idx) \
 	if (!car(args)->IsFixed() && \
-			!car(args)->IsFloat()) { \
+			!car(args)->IsReal()) { \
 		RaiseErrorf(proc ": Unexpected type: arg%d, expected fixednum.",\
 				idx); \
 		return nullptr; \
@@ -593,118 +551,118 @@ Object *Mach::Add(Object *args) {
 		EXPECT_NUMBER("+", i);
 
 		if (!isf)
-			isf = car(args)->IsFloat();
+			isf = car(args)->IsReal();
 		if (isf) {
 			if (rvi) {
 				rvf = rvi; rvi = 0LL;
 			}
-			rvf += car(args)->ToFloat();
+			rvf += car(args)->ToReal();
 		} else {
 			rvi += car(args)->Fixed();
 		}
 		args = cdr(args);
 		++i;
 	}
-	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
+	return isf ? obm_->NewReal(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::Dec(Object *args) {
 	long long rvi = 0LL;
 	double    rvf = 0.0f;
-	bool      isf = car(args)->IsFloat();
+	bool      isf = car(args)->IsReal();
 	int       i = 1;
 	EXPECT_NUMBER("-", i);
 	if (isf)
-		rvf = car(args)->Float();
+		rvf = car(args)->Real();
 	else
 		rvi = car(args)->Fixed();
 	while ((args = cdr(args)) != Kof(EmptyList)) {
 		EXPECT_NUMBER("-", i);
 
 		if (!isf)
-			isf = car(args)->IsFloat();
+			isf = car(args)->IsReal();
 		if (isf) {
 			if (rvi) {
 				rvf = rvi; rvi = 0LL;
 			}
-			rvf -= car(args)->ToFloat();
+			rvf -= car(args)->ToReal();
 		} else {
 			rvi -= car(args)->Fixed();
 		}
 		++i;
 	}
-	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
+	return isf ? obm_->NewReal(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::Mul(Object *args) {
 	long long rvi = 0LL;
 	double    rvf = 0.0f;
-	bool      isf = car(args)->IsFloat();
+	bool      isf = car(args)->IsReal();
 	int       i = 1;
 	EXPECT_NUMBER("*", i);
 	if (isf)
-		rvf = car(args)->Float();
+		rvf = car(args)->Real();
 	else
 		rvi = car(args)->Fixed();
 	while ((args = cdr(args)) != Kof(EmptyList)) {
 		EXPECT_NUMBER("*", i);
 
 		if (!isf)
-			isf = car(args)->IsFloat();
+			isf = car(args)->IsReal();
 		if (isf) {
 			if (rvi) {
 				rvf = rvi; rvi = 0LL;
 			}
-			rvf *= car(args)->ToFloat();
+			rvf *= car(args)->ToReal();
 		} else {
 			rvi *= car(args)->Fixed();
 		}
 		++i;
 	}
-	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
+	return isf ? obm_->NewReal(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::Div(Object *args) {
 	long long rvi = 0LL;
 	double    rvf = 0.0f;
-	bool      isf = car(args)->IsFloat();
+	bool      isf = car(args)->IsReal();
 	int       i = 1;
 	EXPECT_NUMBER("/", i);
 	if (isf)
-		rvf = car(args)->Float();
+		rvf = car(args)->Real();
 	else
 		rvi = car(args)->Fixed();
 	while ((args = cdr(args)) != Kof(EmptyList)) {
 		EXPECT_NUMBER("/", i);
 
-		if (car(args)->ToFloat() == 0.0) {
+		if (car(args)->ToReal() == 0.0) {
 			RaiseErrorf("div : Can not divide by zero, in arg%d.", i);
 			return nullptr;
 		}
 		if (!isf)
-			isf = car(args)->IsFloat();
+			isf = car(args)->IsReal();
 		if (isf) {
 			if (rvi) {
 				rvf = rvi; rvi = 0LL;
 			}
-			rvf /= car(args)->ToFloat();
+			rvf /= car(args)->ToReal();
 		} else {
 			rvi /= car(args)->Fixed();
 		}
 		++i;
 	}
-	return isf ? obm_->NewFloat(rvf) : obm_->NewFixed(rvi);
+	return isf ? obm_->NewReal(rvf) : obm_->NewFixed(rvi);
 }
 
 Object *Mach::NumberEqual(Object *args) {
 	EXPECT_NUMBER("=", 0);
 
-	double arg0 = car(args)->ToFloat();
+	double arg0 = car(args)->ToReal();
 	int    i = 1;
 	while ((args = cdr(args)) != Kof(EmptyList)) {
 		EXPECT_NUMBER("=", i);
 
-		if (arg0 != car(args)->ToFloat())
+		if (arg0 != car(args)->ToReal())
 			return Kof(False);
 		++i;
 	}
@@ -714,13 +672,13 @@ Object *Mach::NumberEqual(Object *args) {
 Object *Mach::NumberGreat(Object *args) {
 	EXPECT_NUMBER(">", 0);
 
-	double arg0 = car(args)->ToFloat();
+	double arg0 = car(args)->ToReal();
 	int    i = 1;
 	while ((args = cdr(args)) != Kof(EmptyList)) {
 		EXPECT_NUMBER(">", i);
 
-		double next = car(args)->ToFloat();
-		if (arg0 > car(args)->ToFloat())
+		double next = car(args)->ToReal();
+		if (arg0 > car(args)->ToReal())
 			arg0 = next;
 		else
 			return Kof(False);
@@ -732,13 +690,13 @@ Object *Mach::NumberGreat(Object *args) {
 Object *Mach::NumberLess(Object *args) {
 	EXPECT_NUMBER("<", 0);
 
-	double arg0 = car(args)->ToFloat();
+	double arg0 = car(args)->ToReal();
 	int    i = 1;
 	while ((args = cdr(args)) != Kof(EmptyList)) {
 		EXPECT_NUMBER("<", i);
 
-		double next = car(args)->ToFloat();
-		if (arg0 < car(args)->ToFloat())
+		double next = car(args)->ToReal();
+		if (arg0 < car(args)->ToReal())
 			arg0 = next;
 		else
 			return Kof(False);
@@ -840,8 +798,8 @@ Object *Mach::IsInteger(Object *args) {
 	return car(args)->IsFixed() ? Kof(True) : Kof(False);
 }
 
-Object *Mach::IsFloat(Object *args) {
-	return car(args)->IsFloat() ? Kof(True) : Kof(False);
+Object *Mach::IsReal(Object *args) {
+	return car(args)->IsReal() ? Kof(True) : Kof(False);
 }
 
 Object *Mach::IsString(Object *args) {

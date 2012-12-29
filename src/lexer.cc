@@ -56,12 +56,16 @@ Object *Lexer::Next() {
 			return ReadNumber();
 		case '.':
 			if (isdigit(cur_[1]))
-				return ReadFloat(0LL, +1);
+				return ReadReal(0LL, +1);
 			return ReadSymbol();
 		case '\'':
 			++cur_;
 			return obm_->Cons(Kof(QuoteSymbol),
 					obm_->Cons(Next(), Kof(EmptyList)));
+		case ';':
+			while (!Eof() && *cur_++ != '\n')
+				(void)0;
+			break;
 		default:
 			if (isdigit(*cur_))
 				return ReadNumber();
@@ -151,7 +155,7 @@ Object *Lexer::ReadNumber() {
 		if (isdigit(*cur_)) {
 			num = (num * 10) + (*cur_++ - '0');
 		} else if (*cur_ == '.') {
-			return ReadFloat(num, sign);
+			return ReadReal(num, sign);
 		} else {
 			RaiseError("Unexpected digit character.");
 			return nullptr;
@@ -160,7 +164,7 @@ Object *Lexer::ReadNumber() {
 	return ExpectDelimiter() ? obm_->NewFixed(num * sign) : nullptr;
 }
 
-Object *Lexer::ReadFloat(long long initial, int sign) {
+Object *Lexer::ReadReal(long long initial, int sign) {
 	++cur_; // Skip `.'
 	char literal[1024] = {0};
 	snprintf(literal, sizeof(literal),
@@ -177,7 +181,7 @@ Object *Lexer::ReadFloat(long long initial, int sign) {
 	}
 	literal[p] = '\0';
 	return ExpectDelimiter() ?
-		obm_->NewFloat(atof(literal)) : nullptr;
+		obm_->NewReal(atof(literal)) : nullptr;
 }
 
 Object *Lexer::ReadSymbol() {

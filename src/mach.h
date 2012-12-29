@@ -125,7 +125,7 @@ private:
 	values::Object *IsNull(values::Object *args);
 	values::Object *IsPair(values::Object *args);
 	values::Object *IsInteger(values::Object *args);
-	values::Object *IsFloat(values::Object *args);
+	values::Object *IsReal(values::Object *args);
 	values::Object *IsString(values::Object *args);
 	values::Object *IsByteVector(values::Object *args);
 	values::Object *IsProcedure(values::Object *args);

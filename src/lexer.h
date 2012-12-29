@@ -37,7 +37,7 @@ public:
 
 	values::Object *ReadNumber();
 
-	values::Object *ReadFloat(long long initial, int sign);
+	values::Object *ReadReal(long long initial, int sign);
 
 	values::Object *ReadSymbol();
 

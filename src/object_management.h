@@ -103,9 +103,9 @@ public:
 		return o;
 	}
 
-	Object *NewFloat(double value) {
-		Object *o = AllocateObject(FLOAT);
-		o->float_ = value;
+	Object *NewReal(double value) {
+		Object *o = AllocateObject(REAL);
+		o->real_ = value;
 		return o;
 	}
 

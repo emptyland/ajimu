@@ -26,8 +26,8 @@ std::string Object::ToString(ObjectManagement *obm) {
 		return utils::Formatf("%s", Symbol());
 	case FIXED:
 		return utils::Formatf("%lld", Fixed());
-	case FLOAT:
-		return utils::Formatf("%lf", Float());
+	case REAL:
+		return utils::Formatf("%lf", Real());
 	case CHARACTER:
 		return utils::Formatf("%c", Character());
 	case STRING:
