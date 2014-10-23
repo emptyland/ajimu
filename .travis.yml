@@ -4,5 +4,8 @@ compiler:
     - clang
 
 script:
+    - if [[ $CC == "clang" ]]; then export CC=`which clang`; fi
+    - if [[ $CXX == "clang++" ]]; then export CXX=`which clang++`; fi
+    - ln -snf src/third_party/glog/config.linux src/third_party/glog/config.h
     - scons -Q
     - src/all_test
