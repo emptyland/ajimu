@@ -6,6 +6,6 @@ compiler:
 script:
     - if [[ $CC == "clang" ]]; then export CC=`which clang`; fi
     - if [[ $CXX == "clang++" ]]; then export CXX=`which clang++`; fi
-    - ln -snf src/third_party/glog/config.linux src/third_party/glog/config.h
+    - "cd src/third_party/glog && ln -snf config.linux config.h && cd -"
     - scons -Q
     - src/all_test
