@@ -6,4 +6,3 @@ tags
 *_test
 *.swp
 src/ajimu
-src/third_party/glog/config.h
